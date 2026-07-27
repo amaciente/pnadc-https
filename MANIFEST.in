@@ -1,0 +1,8 @@
+include LICENSE
+include README.md
+include NOTICE.md
+include CHANGELOG.md
+include CITATION.cff
+include config.example.yml
+include requirements.txt
+recursive-include readme *.md

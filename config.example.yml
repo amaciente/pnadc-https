@@ -1,0 +1,17 @@
+# Paths are resolved relative to this configuration file.
+archive: .
+parquet: parquet
+csv: csv
+
+base_urls:
+  trimestral: https://ftp.ibge.gov.br/Trabalho_e_Rendimento/Pesquisa_Nacional_por_Amostra_de_Domicilios_continua/Trimestral/Microdados/
+  anual: https://ftp.ibge.gov.br/Trabalho_e_Rendimento/Pesquisa_Nacional_por_Amostra_de_Domicilios_continua/Anual/Microdados/
+
+network:
+  connect_timeout: 20
+  read_timeout: 120
+  retries: 4
+  workers: 4
+  chunk_size: 1048576
+  user_agent: pnadc/0.2.0
+

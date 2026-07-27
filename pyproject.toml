@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pnadc"
+dynamic = ["version"]
+description = "Maintain local, standardized repositories of IBGE PNAD Continua microdata"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "GPL-3.0-or-later"}
+authors = [{name = "PNADC contributors"}]
+keywords = ["IBGE", "PNAD Continua", "microdata", "parquet", "Brazil"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = [
+  "requests>=2.31",
+  "PyYAML>=6.0",
+  "pyarrow>=14",
+  "xlrd>=2.0.1",
+  "openpyxl>=3.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/amaciente/pnadc"
+Repository = "https://github.com/amaciente/pnadc"
+Issues = "https://github.com/amaciente/pnadc/issues"
+Changelog = "https://github.com/amaciente/pnadc/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+panel = ["pandas>=2.0"]
+dev = ["build>=1.2", "pytest>=8", "twine>=5"]
+all = ["pandas>=2.0"]
+
+[project.scripts]
+pnadc = "pnadc.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# The version is declared once, in src/pnadc/_version.py.
+[tool.setuptools.dynamic]
+version = {attr = "pnadc._version.__version__"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

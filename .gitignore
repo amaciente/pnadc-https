@@ -1,0 +1,34 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+.venv/
+dist/
+build/
+
+# Local configuration: machine-specific paths.
+# config.example.yml is the tracked template; `pnadc init` writes pnadc.yml.
+config.yml
+pnadc.yml
+
+# Large/generated PNAD artifacts. These are rebuilt from IBGE by `pnadc sync`
+# and `pnadc convert-many`; they must never be committed.
+archive/
+originals/
+metadata/
+parquet/
+csv/
+extracted/
+panels/
+.pnadc/
+*.part
+*.parquet
+*.csv
+
+# Test scratch space
+tests/_work/
+
+# Keep tracked templates and fixtures that the rules above would otherwise hide.
+!config.example.yml
+!readme/**

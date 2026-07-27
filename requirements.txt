@@ -1,0 +1,6 @@
+requests>=2.31
+PyYAML>=6.0
+pyarrow>=14
+xlrd>=2.0.1
+openpyxl>=3.1
+
