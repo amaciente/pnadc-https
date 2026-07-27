@@ -1,6 +1,6 @@
-# pnadc
+# pnadc-https
 
-`pnadc` maintains a local PNAD Contínua archive without requiring FTP.
+`pnadc-https` maintains a local PNAD Contínua archive without requiring FTP.
 It recursively lists the public IBGE directory indexes over HTTPS, downloads
 only new or changed files, normalizes the IBGE fixed-width dictionaries, and
 converts microdata to Parquet or CSV.
@@ -8,7 +8,7 @@ converts microdata to Parquet or CSV.
 The project was created for networks where `https://ftp.ibge.gov.br` is
 reachable but FTP port 21 and passive FTP ports are blocked.
 
-**`pnadc` is derived from [`pynad`](https://pypi.org/project/pynad/), created
+**`pnadc-https` is derived from [`pynad`](https://pypi.org/project/pynad/), created
 by [Rafael Guerreiro Osorio](https://pypi.org/project/pynad/) at
 [Ipea](https://www.ipea.gov.br/).** `pynad` established the workflow this
 package follows — mirroring the IBGE archive, normalizing the dictionaries,
@@ -40,25 +40,37 @@ Detailed user guides are available in the [`readme`](readme/) folder:
 installation, portable configuration, CLI and Python usage, R/RStudio access,
 maintenance, and compatibility/methodology.
 
+## A note on names
+
+| | |
+|---|---|
+| Distribution | `pnadc-https` — what you install |
+| Import package | `pnadc_https` — `from pnadc_https import Repository` |
+| Command | `pnadc` — the CLI |
+
+> **`pip install pnadc` installs a different project.** The name `pnadc` on
+> PyPI belongs to an unrelated package that also works with IBGE PNADC data.
+> This one is `pnadc-https`.
+
 ## Install
 
 Requires Python 3.10 or newer. Install directly from GitHub:
 
 ```
-python -m pip install git+https://github.com/amaciente/pnadc.git
+python -m pip install git+https://github.com/amaciente/pnadc-https.git
 ```
 
 The `panel` command additionally needs `pandas`; install it with the extra if
 you intend to build person panels:
 
 ```
-python -m pip install "pnadc[panel] @ git+https://github.com/amaciente/pnadc.git"
+python -m pip install "pnadc[panel] @ git+https://github.com/amaciente/pnadc-https.git"
 ```
 
 To work on the package itself, clone it and install in editable mode:
 
 ```
-git clone https://github.com/amaciente/pnadc.git
+git clone https://github.com/amaciente/pnadc-https.git
 ```
 
 ```

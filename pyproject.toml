@@ -29,10 +29,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/amaciente/pnadc"
-Repository = "https://github.com/amaciente/pnadc"
-Issues = "https://github.com/amaciente/pnadc/issues"
-Changelog = "https://github.com/amaciente/pnadc/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/amaciente/pnadc-https"
+Repository = "https://github.com/amaciente/pnadc-https"
+Issues = "https://github.com/amaciente/pnadc-https/issues"
+Changelog = "https://github.com/amaciente/pnadc-https/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 panel = ["pandas>=2.0"]

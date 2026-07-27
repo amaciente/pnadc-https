@@ -14,7 +14,7 @@ five-wave panel builder additionally uses pandas.
 The quickest route, into whichever environment is currently active:
 
 ```powershell
-python -m pip install git+https://github.com/amaciente/pnadc.git
+python -m pip install git+https://github.com/amaciente/pnadc-https.git
 ```
 
 ## Install from a local clone
@@ -22,8 +22,8 @@ python -m pip install git+https://github.com/amaciente/pnadc.git
 Create an isolated environment first if you prefer one:
 
 ```powershell
-git clone https://github.com/amaciente/pnadc.git
-cd pnadc
+git clone https://github.com/amaciente/pnadc-https.git
+cd pnadc-https
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip

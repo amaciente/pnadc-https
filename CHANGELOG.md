@@ -87,6 +87,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.xls`/`.xlsx` dictionary parsing, metadata catalog, streaming fixed-width
   conversion to Parquet, and person-panel construction.
 
-[Unreleased]: https://github.com/amaciente/pnadc/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/amaciente/pnadc/releases/tag/v0.3.0
-[0.2.0]: https://github.com/amaciente/pnadc/releases/tag/v0.2.0
+[Unreleased]: https://github.com/amaciente/pnadc-https/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/amaciente/pnadc-https/releases/tag/v0.3.0
+[0.2.0]: https://github.com/amaciente/pnadc-https/releases/tag/v0.2.0

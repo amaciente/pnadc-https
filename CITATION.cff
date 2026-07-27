@@ -1,12 +1,12 @@
 cff-version: 1.2.0
-title: "pnadc: local, standardized repositories of IBGE PNAD Contínua microdata"
+title: "pnadc-https: local, standardized repositories of IBGE PNAD Contínua microdata"
 message: "If you use this software, please cite it as below."
 type: software
 authors:
   - family-names: Maciente
     given-names: Aguinaldo
     alias: amaciente
-repository-code: "https://github.com/amaciente/pnadc"
+repository-code: "https://github.com/amaciente/pnadc-https"
 abstract: >-
   Command-line tool and Python API that maintains a local repository of
   Brazilian IBGE PNAD Contínua (Continuous National Household Sample Survey)

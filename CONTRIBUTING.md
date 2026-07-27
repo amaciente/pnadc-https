@@ -1,11 +1,11 @@
 # Contributing
 
-Thanks for your interest in `pnadc`. Bug reports, documentation fixes, and
+Thanks for your interest in `pnadc-https`. Bug reports, documentation fixes, and
 pull requests are welcome.
 
 ## Reporting problems
 
-Open an issue at <https://github.com/amaciente/pnadc/issues>. For a failing
+Open an issue at <https://github.com/amaciente/pnadc-https/issues>. For a failing
 command, please include:
 
 - the exact command you ran, with `-v` or `-vv` added;
@@ -19,8 +19,8 @@ almost every problem.
 ## Development setup
 
 ```powershell
-git clone https://github.com/amaciente/pnadc.git
-cd pnadc
+git clone https://github.com/amaciente/pnadc-https.git
+cd pnadc-https
 python -m pip install -e ".[all]"
 pnadc doctor
 ```
