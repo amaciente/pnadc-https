@@ -10,7 +10,7 @@ from zipfile import BadZipFile, ZipFile
 
 from .config import Settings
 from .layouts import Layout, load_layout, write_layout
-from .utils import atomic_json, load_json, sha256_file
+from .utils import atomic_json, load_json, portable_path, sha256_file
 
 LOG = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ def _microdata_sources(settings: Settings) -> list[dict[str, object]]:
             quarter = int(compact_quarter.group(1)) if compact_quarter else None
         records.append(
             {
-                "source": str(relative),
+                "source": relative.as_posix(),
                 "member": members[0] if len(members) == 1 else None,
                 "members": members,
                 "scope": _scope(relative),
@@ -214,11 +214,14 @@ def generate_metadata(settings: Settings, force: bool = False) -> dict[str, obje
             layout: Layout = load_layout(source.path, source.member)
             layout.source.update(
                 {
-                    "archive_path": str(source.path.relative_to(settings.archive)),
+                    "archive_path": portable_path(source.path, settings.archive),
                     "archive_member": source.member or "",
                     "dictionary_sha256": dictionary_sha256,
                 }
             )
+            # load_layout records the absolute path it was read from, which is
+            # machine-specific; archive_path above replaces it.
+            layout.source.pop("path", None)
             write_layout(layout, target)
             LOG.info("Parsed dictionary %s", source.path.name)
         layout_records.append(
@@ -227,9 +230,9 @@ def generate_metadata(settings: Settings, force: bool = False) -> dict[str, obje
                 "scope": source.scope,
                 "anual_kind": source.anual_kind,
                 "year": source.year,
-                "source": str(source.path.relative_to(settings.archive)),
+                "source": portable_path(source.path, settings.archive),
                 "member": source.member,
-                "layout": str(target.relative_to(settings.archive)),
+                "layout": portable_path(target, settings.archive),
             }
         )
         LOG.info("Cataloged layout %s", slug)
@@ -241,8 +244,13 @@ def generate_metadata(settings: Settings, force: bool = False) -> dict[str, obje
         data["layout_id"] = choice["id"] if choice else None
 
     catalog: dict[str, object] = {
-        "schema_version": 1,
-        "archive": str(settings.archive),
+        "schema_version": 2,
+        # Every path below is relative to the repository root and uses forward
+        # slashes, so the catalog stays valid when the repository is moved or
+        # read on another operating system. The root itself is deliberately
+        # not recorded: it is machine-specific and comes from the
+        # configuration at read time.
+        "paths_relative_to": "repository root",
         "layouts": layout_records,
         "microdata": microdata,
     }

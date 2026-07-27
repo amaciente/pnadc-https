@@ -47,6 +47,26 @@ def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
         return sha256_stream(stream, chunk_size)
 
 
+def portable_path(path: Path, root: Path | None) -> str:
+    """Render *path* for storage in a metadata file.
+
+    Paths inside *root* are written relative to it and with forward slashes,
+    so that a repository stays valid when it is moved, copied to another
+    machine, or read on a different operating system. A Windows-style
+    relative path is not portable: ``originals\\trimestral\\x.zip`` is a
+    single filename on Linux, not three path components.
+
+    Paths outside *root* — an output directory on another volume, for
+    example — cannot be expressed relatively and are kept absolute.
+    """
+    if root is not None:
+        try:
+            return path.resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            pass
+    return str(path)
+
+
 def human_size(size: int | None) -> str:
     if size is None:
         return "unknown"

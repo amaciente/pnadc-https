@@ -286,6 +286,12 @@ Each output carries a provenance sidecar named after it
 record count, and conversion options. CSV can require substantially more
 disk space than Parquet for the same data.
 
+Everything generated inside the repository — `catalog.json`, the parsed
+layouts, provenance sidecars, and the sync manifest — records paths relative
+to the repository root, with forward slashes. A repository can therefore be
+moved to another drive, copied to another machine, or read from a different
+operating system without regenerating anything.
+
 **Staying current.** Re-running batch conversion does not simply skip
 outputs that already exist — it compares each one against a fingerprint of
 its inputs and options, and reconverts when anything that determines the

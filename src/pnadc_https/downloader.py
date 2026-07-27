@@ -303,7 +303,9 @@ def sync_archive(
             result.downloaded += 1
             result.bytes_downloaded += count
             entry = asdict(remote)
-            entry.update({"local": str(local.relative_to(settings.archive)), "sha256": digest})
+            entry.update(
+                {"local": local.relative_to(settings.archive).as_posix(), "sha256": digest}
+            )
             new_files[remote.key] = entry
             LOG.info("Downloaded %s", remote.key)
 

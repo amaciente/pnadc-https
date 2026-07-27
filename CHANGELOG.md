@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Derived metadata was not portable.** The configuration could always be
+  moved, but the files generated beside the data could not. `catalog.json`
+  recorded the absolute archive root, and provenance sidecars recorded
+  absolute source, layout, and output paths, so a repository copied to
+  another machine or drive described files that were no longer where it said
+  they were. Every path is now relative to the repository root.
+- **Stored relative paths used the host's separator.** A repository built on
+  Windows recorded `originals\trimestral\...`, which is a single filename on
+  Linux rather than three path components, so such a repository could not be
+  read there at all. Paths in `catalog.json`, parsed layouts, provenance
+  sidecars, the sync manifest, and the extraction state are now written with
+  forward slashes, which both platforms accept.
+
+### Changed
+
+- `catalog.json` is schema version 2: the absolute `archive` key is gone,
+  replaced by a `paths_relative_to` marker. Provenance is schema version 3
+  and carries the same marker.
+- Conversion freshness no longer depends on the package version. A dedicated
+  `conversion_format_version` is compared instead, bumped only when a release
+  changes what a conversion produces. Previously any release — including a
+  documentation-only one — invalidated every output and forced a full
+  reconversion of the archive.
+- `convert_file()` accepts `root=` to record paths relative to a repository.
+  Called directly without it, absolute paths are still written, since a
+  standalone conversion has no repository to be relative to.
+
+### Added
+
+- `tests/test_portable_metadata.py`, including a test that builds a
+  repository, moves it, and checks that the catalog is byte-identical and
+  still resolves without reconverting.
+
 ## [0.3.0] - 2026-07-27
 
 ### Fixed

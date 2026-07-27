@@ -15,12 +15,19 @@ from zipfile import ZipFile
 from ._version import __version__
 from .config import Settings
 from .layouts import Layout, Variable, load_layout
-from .utils import atomic_json, ensure_within, load_json, sha256_file
+from .utils import atomic_json, ensure_within, load_json, portable_path, sha256_file
 
 LOG = logging.getLogger(__name__)
 
 # Bumped when the meaning of a provenance record changes.
-PROVENANCE_SCHEMA_VERSION = 2
+PROVENANCE_SCHEMA_VERSION = 3
+
+# Bumped only when a release changes the *content* a conversion produces, so
+# that existing outputs are rebuilt. Deliberately separate from the package
+# version: tying freshness to every release would rebuild an entire archive
+# after a documentation-only patch, which for PNADC means hours of work and
+# tens of gigabytes rewritten for no change in the data.
+CONVERSION_FORMAT_VERSION = 1
 
 
 def conversion_fingerprint(
@@ -48,7 +55,7 @@ def conversion_fingerprint(
         "columns": sorted(name.lower() for name in columns) if columns is not None else None,
         "all_string": all_string,
         "output_format": output_format,
-        "package_version": __version__,
+        "conversion_format_version": CONVERSION_FORMAT_VERSION,
     }
 
 
@@ -227,6 +234,7 @@ def convert_file(
     force: bool = False,
     provenance_path: str | Path | None = None,
     columns: Iterable[str] | None = None,
+    root: str | Path | None = None,
 ) -> dict[str, object]:
     source_path = Path(source).resolve()
     layout_file = Path(layout_path).resolve()
@@ -249,14 +257,18 @@ def convert_file(
             raise ValueError("Output extension must be .csv or .parquet")
     os.replace(temporary, target)
     output_format = "csv" if target.suffix.lower() == ".csv" else "parquet"
+    # Paths are stored relative to the repository root where possible, so the
+    # record stays valid if the repository is moved or read elsewhere.
+    repository = Path(root).resolve() if root is not None else None
     provenance: dict[str, object] = {
         "schema_version": PROVENANCE_SCHEMA_VERSION,
-        "source": str(source_path),
+        "paths_relative_to": "repository root" if repository is not None else None,
+        "source": portable_path(source_path, repository),
         "source_name": source_path.name,
         "source_member": member,
-        "layout": str(layout_file),
+        "layout": portable_path(layout_file, repository),
         "layout_member": layout_member,
-        "output": str(target),
+        "output": portable_path(target, repository),
         "output_name": target.name,
         "rows": rows,
         "columns": len(variables),
@@ -340,6 +352,7 @@ def convert_catalog(
             all_string=all_string,
             provenance_path=provenance_path,
             columns=columns,
+            root=settings.archive,
         )
         converted += 1
         LOG.info("Converted %s", source)

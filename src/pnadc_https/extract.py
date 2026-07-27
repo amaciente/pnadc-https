@@ -64,7 +64,7 @@ def extract_archive(settings: Settings, force: bool = False) -> tuple[int, int]:
         outputs = extract_zip(source, target, force=force)
         records[key] = {
             "source": fingerprint,
-            "outputs": [str(path.relative_to(settings.archive)) for path in outputs],
+            "outputs": [path.relative_to(settings.archive).as_posix() for path in outputs],
         }
         processed += 1
         LOG.info("Extracted %s", relative)
