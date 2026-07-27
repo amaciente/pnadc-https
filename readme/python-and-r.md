@@ -1,6 +1,9 @@
 # Python, R, VS Code, and RStudio
 
 The data repository is independent from the application used to read it.
+Paths below use `C:\data\pnadc` as the repository location; substitute your
+own. Note that R and DuckDB accept forward slashes on Windows, which avoids
+escaping backslashes.
 
 ## Python
 

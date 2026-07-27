@@ -9,17 +9,28 @@
 Parquet conversion is included in the base installation. The optional
 five-wave panel builder additionally uses pandas.
 
-## Install from this folder
+## Install from GitHub
 
-Create an isolated environment:
+The quickest route, into whichever environment is currently active:
 
 ```powershell
-cd C:\path\to\pnadc
+python -m pip install git+https://github.com/amaciente/pnadc.git
+```
+
+## Install from a local clone
+
+Create an isolated environment first if you prefer one:
+
+```powershell
+git clone https://github.com/amaciente/pnadc.git
+cd pnadc
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install .
 ```
+
+On macOS or Linux, activate with `source .venv/bin/activate` instead.
 
 For development, install in editable mode with tests:
 
@@ -45,12 +56,15 @@ python -m pip install build
 python -m build
 ```
 
-Copy the `.whl` file from `dist\` to the other machine, then run:
+Copy the `.whl` file from `dist\` to the other machine, then install it by
+name (the filename carries the version, for example `pnadc-0.2.0-py3-none-any.whl`):
 
 ```powershell
-python -m pip install .\pnadc-0.2.0-py3-none-any.whl
+python -m pip install .\dist\pnadc-*.whl
 pnadc --version
 ```
+
+This is useful for machines with no direct access to GitHub.
 
 The wheel contains code, not microdata. Create or copy a data repository
 separately.

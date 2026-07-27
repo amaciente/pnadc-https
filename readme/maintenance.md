@@ -1,5 +1,7 @@
 # Updates, recovery, and safety
 
+Examples use `C:\data\pnadc` as the repository path; substitute your own.
+
 ## Routine update
 
 Start narrow and inspect:

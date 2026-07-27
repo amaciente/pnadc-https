@@ -1,5 +1,9 @@
 # CLI and Python API
 
+Examples use `C:\data\pnadc` as the repository path and PowerShell line
+continuations; substitute your own path, and see
+[configuration](configuration.md) for the platform note.
+
 ## Recommended update workflow
 
 Preview a narrow synchronization:
