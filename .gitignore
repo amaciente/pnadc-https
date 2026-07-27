@@ -30,6 +30,11 @@ panels/
 # Test scratch space
 tests/_work/
 
+# Local reference material: pynad documentation, IBGE notes, papers. These are
+# third-party works kept for consultation, not part of this package and not
+# ours to redistribute.
+references/
+
 # Keep tracked templates and fixtures that the rules above would otherwise hide.
 !config.example.yml
 !readme/**
