@@ -226,11 +226,29 @@ runs the same batch conversion as part of the combined
 sync-catalog-convert pipeline.
 
 A trailing IBGE revision date is removed from the output name, so
-`PNADC_012012_20250815.zip` produces `PNADC_012012.parquet` (or `.csv`). The
-neighboring provenance file retains the original source stem
-(`PNADC_012012_20250815.parquet.provenance.json`) and records the source,
-dictionary, record count, and conversion options. CSV can require
-substantially more disk space than Parquet for the same data.
+`PNADC_012012_20250815.zip` produces `PNADC_012012.parquet` (or `.csv`).
+Each output carries a provenance sidecar named after it
+(`PNADC_012012.parquet.provenance.json`) recording the source, dictionary,
+record count, and conversion options. CSV can require substantially more
+disk space than Parquet for the same data.
+
+**Staying current.** Re-running batch conversion does not simply skip
+outputs that already exist — it compares each one against a fingerprint of
+its inputs and options, and reconverts when anything that determines the
+content has changed:
+
+- IBGE published a revised release (including under a new filename that maps
+  to the same output name, such as `PNADC_012012_20260701.zip`);
+- the source was replaced under its existing filename;
+- the dictionary was reissued, changing column positions;
+- `--columns` or `--all-string` differs from the previous run;
+- the package version changed.
+
+Outputs that are genuinely up to date are still skipped, so routine
+re-synchronization remains inexpensive. Sources are compared by size and
+modification time rather than by hash, because hashing every multi-hundred
+megabyte archive would turn an up-to-date run into a full read of the
+repository; dictionaries, being small, are compared by SHA-256.
 
 ### Build a person panel
 

@@ -10,7 +10,10 @@ class RepositoryApiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "data"
             config = init_repository(root)
-            self.assertEqual(config, root / "pnadc.yml")
+            # init_repository resolves its argument, so compare against a
+            # resolved path. On Windows CI the temporary directory can be an
+            # 8.3 short path (RUNNER~1) that resolves to a different string.
+            self.assertEqual(config, (root / "pnadc.yml").resolve())
             self.assertTrue((root / "originals" / "trimestral").is_dir())
             self.assertTrue((root / "metadata" / "layouts").is_dir())
             repository = Repository(config)

@@ -41,6 +41,12 @@ def sha256_stream(stream: BinaryIO, chunk_size: int = 1024 * 1024) -> str:
     return digest.hexdigest()
 
 
+def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
+    """Hash a file's contents. Intended for small inputs such as dictionaries."""
+    with path.open("rb") as stream:
+        return sha256_stream(stream, chunk_size)
+
+
 def human_size(size: int | None) -> str:
     if size is None:
         return "unknown"

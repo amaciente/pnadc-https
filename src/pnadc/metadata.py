@@ -10,7 +10,7 @@ from zipfile import BadZipFile, ZipFile
 
 from .config import Settings
 from .layouts import Layout, load_layout, write_layout
-from .utils import atomic_json
+from .utils import atomic_json, load_json, sha256_file
 
 LOG = logging.getLogger(__name__)
 
@@ -178,6 +178,19 @@ def _choose_layout(data: dict[str, object], layouts: list[dict[str, object]]) ->
     return max(candidates, key=lambda item: _layout_score(data, item))
 
 
+def _layout_is_current(target: Path, dictionary_sha256: str) -> bool:
+    """Report whether a parsed layout still matches its source dictionary.
+
+    A layout written before hashes were recorded has no ``dictionary_sha256``
+    and cannot prove it is current, so it is reparsed once.
+    """
+    existing = load_json(target, None)
+    if not isinstance(existing, dict):
+        return False
+    recorded = (existing.get("source") or {}).get("dictionary_sha256")
+    return recorded == dictionary_sha256
+
+
 def generate_metadata(settings: Settings, force: bool = False) -> dict[str, object]:
     """Parse all local dictionaries and inventory all local microdata archives."""
     layouts_dir = settings.metadata_dir / "layouts"
@@ -193,15 +206,21 @@ def generate_metadata(settings: Settings, force: bool = False) -> dict[str, obje
             counter += 1
         used_names.add(slug)
         target = layouts_dir / f"{slug}.json"
-        if force or not target.is_file():
+        # A dictionary that IBGE revised in place must not keep its old parsed
+        # layout. Compare the dictionary's hash with the one recorded in the
+        # existing layout, and reparse whenever it differs or is absent.
+        dictionary_sha256 = sha256_file(source.path)
+        if force or not _layout_is_current(target, dictionary_sha256):
             layout: Layout = load_layout(source.path, source.member)
             layout.source.update(
                 {
                     "archive_path": str(source.path.relative_to(settings.archive)),
                     "archive_member": source.member or "",
+                    "dictionary_sha256": dictionary_sha256,
                 }
             )
             write_layout(layout, target)
+            LOG.info("Parsed dictionary %s", source.path.name)
         layout_records.append(
             {
                 "id": slug,

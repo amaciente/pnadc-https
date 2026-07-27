@@ -12,11 +12,73 @@ from pathlib import Path
 from typing import IO, Iterable, Iterator
 from zipfile import ZipFile
 
+from ._version import __version__
 from .config import Settings
 from .layouts import Layout, Variable, load_layout
-from .utils import atomic_json, ensure_within, load_json
+from .utils import atomic_json, ensure_within, load_json, sha256_file
 
 LOG = logging.getLogger(__name__)
+
+# Bumped when the meaning of a provenance record changes.
+PROVENANCE_SCHEMA_VERSION = 2
+
+
+def conversion_fingerprint(
+    source: Path,
+    layout_path: Path,
+    columns: Iterable[str] | None,
+    all_string: bool,
+    output_format: str,
+) -> dict[str, object]:
+    """Describe everything that determines the content of a converted file.
+
+    An existing output is only current if its recorded fingerprint matches
+    the one computed now. The source is identified by size and modification
+    time rather than a hash: conversion inputs are hundreds of megabytes
+    each, and hashing every one would turn an up-to-date `convert-many` from
+    a no-op into a full read of the archive. The dictionary is hashed because
+    it is small and a silent revision there changes every column position.
+    """
+    stat = source.stat()
+    return {
+        "source_name": source.name,
+        "source_size": stat.st_size,
+        "source_mtime_ns": stat.st_mtime_ns,
+        "layout_sha256": sha256_file(layout_path),
+        "columns": sorted(name.lower() for name in columns) if columns is not None else None,
+        "all_string": all_string,
+        "output_format": output_format,
+        "package_version": __version__,
+    }
+
+
+def _recorded_provenance(
+    provenance_path: Path, legacy_path: Path
+) -> dict[str, object] | None:
+    """Load an output's provenance, tolerating the pre-0.3 naming scheme.
+
+    Before 0.3.0 the sidecar was named after the source rather than the
+    output. Falling back to that name keeps an existing archive from being
+    reconverted in full the first time it is used with this version.
+    """
+    current = load_json(provenance_path, None)
+    if current is not None:
+        return current
+    return load_json(legacy_path, None)
+
+
+def _is_current(recorded: dict[str, object] | None, expected: dict[str, object]) -> bool:
+    """Compare a stored fingerprint with the expected one."""
+    if not isinstance(recorded, dict):
+        return False
+    fingerprint = recorded.get("fingerprint")
+    if not isinstance(fingerprint, dict):
+        # Written before fingerprints existed. Such a record cannot prove the
+        # output is current, but it does name the source it came from, which
+        # is enough to catch the common case of a new IBGE revision arriving
+        # under a new filename. Anything else is reconverted once.
+        return recorded.get("source_name") == expected["source_name"]
+    return all(fingerprint.get(key) == value for key, value in expected.items())
 
 
 def simplified_output_stem(source_stem: str) -> str:
@@ -186,8 +248,9 @@ def convert_file(
         else:
             raise ValueError("Output extension must be .csv or .parquet")
     os.replace(temporary, target)
+    output_format = "csv" if target.suffix.lower() == ".csv" else "parquet"
     provenance: dict[str, object] = {
-        "schema_version": 1,
+        "schema_version": PROVENANCE_SCHEMA_VERSION,
         "source": str(source_path),
         "source_name": source_path.name,
         "source_member": member,
@@ -199,6 +262,10 @@ def convert_file(
         "columns": len(variables),
         "variables": [variable.name for variable in variables] if columns is not None else None,
         "all_string": all_string,
+        # Used by convert_catalog to decide whether this output is still current.
+        "fingerprint": conversion_fingerprint(
+            source_path, layout_file, columns, all_string, output_format
+        ),
     }
     provenance_target = (
         Path(provenance_path).resolve()
@@ -248,16 +315,28 @@ def convert_catalog(
             source_parent = Path()
         target_dir = output_root / str(record.get("scope") or "unknown") / source_parent
         target = target_dir / f"{simplified_output_stem(source.stem)}.{output_format}"
-        provenance_path = target_dir / f"{source.stem}.{output_format}.provenance.json"
+        # Named after the output, not the source: IBGE revisions differ only
+        # by a filename suffix that simplified_output_stem removes, so several
+        # sources map to one output. Keying provenance to the source would
+        # leave the previous revision's record unexaminable and let a stale
+        # output survive a genuine update.
+        provenance_path = target_dir / f"{target.name}.provenance.json"
+        expected = conversion_fingerprint(
+            source, layout_path, columns, all_string, output_format
+        )
+        legacy_provenance = target_dir / f"{source.stem}.{output_format}.provenance.json"
         if target.exists() and not force:
-            skipped += 1
-            continue
+            recorded = _recorded_provenance(provenance_path, legacy_provenance)
+            if _is_current(recorded, expected):
+                skipped += 1
+                continue
+            LOG.info("Reconverting %s; its inputs or options changed", target.name)
         convert_file(
             source,
             layout_path,
             target,
             member=record.get("member"),
-            force=force,
+            force=True,
             all_string=all_string,
             provenance_path=provenance_path,
             columns=columns,
