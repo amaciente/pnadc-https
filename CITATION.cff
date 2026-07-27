@@ -24,3 +24,28 @@ keywords:
   - reproducible research
 license: GPL-3.0-or-later
 version: 0.2.0
+references:
+  - type: software
+    title: "pynad: An application to manage Pnadc microdata and its panels"
+    authors:
+      - family-names: Osorio
+        given-names: Rafael Guerreiro
+        affiliation: Instituto de Pesquisa Econômica Aplicada (Ipea)
+    version: 3.0.3
+    license: GPL-3.0-or-later
+    url: "https://pypi.org/project/pynad/"
+    notes: >-
+      pnadc is derived from pynad, which originated the workflow it
+      implements.
+  - type: software
+    title: "PNADcIBGE: Downloading, Reading and Analyzing PNADC Microdata"
+    authors:
+      - family-names: Assuncao
+        given-names: Gabriel
+      - family-names: Braga
+        given-names: Douglas
+    license: GPL-3.0
+    url: "https://cran.r-project.org/package=PNADcIBGE"
+    notes: >-
+      IBGE's official R package; informed the column-selection workflow and
+      the documentation of deflators and survey design.

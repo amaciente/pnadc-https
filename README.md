@@ -8,6 +8,16 @@ converts microdata to Parquet or CSV.
 The project was created for networks where `https://ftp.ibge.gov.br` is
 reachable but FTP port 21 and passive FTP ports are blocked.
 
+**`pnadc` is derived from [`pynad`](https://pypi.org/project/pynad/), created
+by [Rafael Guerreiro Osorio](https://pypi.org/project/pynad/) at
+[Ipea](https://www.ipea.gov.br/).** `pynad` established the workflow this
+package follows — mirroring the IBGE archive, normalizing the dictionaries,
+standardizing the microdata, and reconstructing the rotating person panels —
+along with the field conventions and data organization reused here. This
+package reimplements that workflow over HTTPS for restricted networks; it is
+a reimplementation rather than a fork, and it is released under the GPL to
+match. See [Relationship to `pynad`](#relationship-to-pynad) for what differs.
+
 Code and data are kept apart. The package is installed like any other Python
 package, while the data repository it builds lives in a directory of your
 choosing — created by `pnadc init` and described by a single `pnadc.yml`
@@ -282,17 +292,40 @@ self-contained and independent of where the package is installed:
 
 ## Relationship to `pynad`
 
-This is a clean HTTPS-first implementation informed by the workflow and public
-data conventions of Rafael Guerreiro Osorio's GPL-licensed `pynad` 3.0.3. It is
-not a byte-for-byte fork. Downloading, dictionary parsing, CSV/Parquet
-conversion, metadata inventory, and panel construction are available, but the
-person-linkage classifier is intentionally simpler and explicitly documented
-above. Keep `pynad` if exact reproduction of its seven-category historical
-panel classifier is required.
+This package exists because of `pynad`, and the credit for the approach
+belongs there.
 
-The replacement fixes the corporate-network failure point in `pynad`: remote
-file discovery is HTTPS-only, not an FTP directory listing followed by HTTPS
-downloads.
+> **`pynad`** — *An application to manage Pnadc microdata and its panels*
+> Rafael Guerreiro Osorio, Instituto de Pesquisa Econômica Aplicada (Ipea)
+> Version 3.0.3, GPL-3.0-or-later
+> <https://pypi.org/project/pynad/> — `pip install pynad`
+
+`pynad` worked out the hard parts of treating PNAD Contínua as a maintained
+local archive rather than a pile of downloaded ZIPs: which files IBGE
+actually publishes and how they are organized, how to read the fixed-width
+dictionaries, which conventions to use when standardizing the microdata, and
+how to reconstruct the rotating five-visit person panels that IBGE
+disseminates only as cross-sections. Those ideas are `pynad`'s, and this
+package follows them.
+
+**What is different here.** `pynad` discovers remote files by listing an FTP
+directory before downloading over HTTPS. On networks where FTP port 21 and
+the passive port range are blocked — common in corporate and government
+environments — that discovery step fails and the tool cannot run. `pnadc`
+performs discovery over HTTPS as well, by walking IBGE's public directory
+indexes, which is the single reason this package was written.
+
+**What is not reproduced.** The person-linkage classifier here is
+deliberately simpler: it links people within a dwelling by sex and birth date
+with a deterministic tiebreak, and documents that plainly. `pynad` implements
+a considerably more careful seven-category historical panel classifier. **If
+you need faithful panel construction, use `pynad`** — this package does not
+replace it, and no comparison of the two classifiers is claimed.
+
+This is a reimplementation, not a fork; no `pynad` source was copied. It is
+released under GPL-3.0-or-later to match `pynad`'s license and to keep the
+lineage explicit. Neither Rafael Osorio nor Ipea has endorsed or reviewed
+this package.
 
 ## Relationship to R's `PNADcIBGE`
 
