@@ -22,6 +22,7 @@ class DictionarySource:
     scope: str
     year: int | None
     anual_kind: str | None = None
+    years: frozenset[int] = frozenset()
 
 
 def _scope(path: Path) -> str:
@@ -55,6 +56,23 @@ def _year(text: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def _covered_years(text: str) -> set[int]:
+    """Return every survey year a dictionary applies to.
+
+    IBGE publishes some annual dictionaries for a span of years rather than
+    one, naming them like ``dicionario_PNADC_microdados_2012_a_2014_visita1``.
+    Reading only the first year would leave 2013 and 2014 microdata with no
+    dictionary at all, so the whole span is expanded.
+    """
+    span = re.search(r"(?<!\d)(20\d{2})_a_(20\d{2})(?!\d)", text, flags=re.IGNORECASE)
+    if span:
+        first, last = int(span.group(1)), int(span.group(2))
+        if first <= last:
+            return set(range(first, last + 1))
+    single = _year(text)
+    return {single} if single is not None else set()
+
+
 def _slug(source: DictionarySource) -> str:
     member = Path(source.member).stem if source.member else source.path.stem
     cleaned = re.sub(r"[^a-z0-9]+", "-", member.lower()).strip("-")
@@ -73,12 +91,21 @@ def _dictionary_sources(settings: Settings) -> list[DictionarySource]:
             continue
         suffix = path.suffix.lower()
         relative = path.relative_to(settings.originals)
+        # Excluded trees are ignored even when already on disk, so that a
+        # previously downloaded copy is not silently cataloged and converted.
+        if settings.is_excluded(relative.as_posix()):
+            continue
         scope = _scope(relative)
         kind = _anual_kind(relative)
         if suffix in (".xls", ".xlsx") and any(
             token in path.name.lower() for token in ("dicion", "input", "layout")
         ):
-            found.append(DictionarySource(path, None, scope, _year(path.name), kind))
+            found.append(
+                DictionarySource(
+                    path, None, scope, _year(path.name), kind,
+                    frozenset(_covered_years(path.name)),
+                )
+            )
         elif suffix == ".zip" and any(
             token in path.name.lower() for token in ("dicion", "input", "document")
         ):
@@ -88,7 +115,15 @@ def _dictionary_sources(settings: Settings) -> list[DictionarySource]:
                         if member.lower().endswith((".xls", ".xlsx")) and any(
                             token in Path(member).name.lower() for token in ("dicion", "input", "layout")
                         ):
-                            found.append(DictionarySource(path, member, scope, _year(member) or _year(path.name), kind))
+                            found.append(
+                                DictionarySource(
+                                    path, member, scope,
+                                    _year(member) or _year(path.name), kind,
+                                    frozenset(
+                                        _covered_years(member) or _covered_years(path.name)
+                                    ),
+                                )
+                            )
             except BadZipFile:
                 LOG.warning("Skipping invalid ZIP while cataloging dictionaries: %s", path)
     unique: dict[tuple[Path, str | None], DictionarySource] = {
@@ -100,6 +135,8 @@ def _dictionary_sources(settings: Settings) -> list[DictionarySource]:
 def _microdata_sources(settings: Settings) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for path in sorted(settings.originals.rglob("*.zip")):
+        if settings.is_excluded(path.relative_to(settings.originals).as_posix()):
+            continue
         try:
             with ZipFile(path) as archive:
                 members = [
@@ -144,6 +181,8 @@ def _layout_score(data: dict[str, object], layout: dict[str, object]) -> int:
         score += 100
     if data.get("year") and data.get("year") == layout.get("year"):
         score += 30
+    elif data.get("year") and data.get("year") in set(layout.get("years") or ()):
+        score += 25  # covered by a multi-year dictionary, but less specific
     elif layout.get("year") is None:
         score += 10
     data_parent = Path(str(data["source"])).parent.parts
@@ -166,7 +205,14 @@ def _choose_layout(data: dict[str, object], layouts: list[dict[str, object]]) ->
             if same_kind:
                 same_scope = same_kind
         if data.get("year"):
-            exact = [item for item in same_scope if item.get("year") == data.get("year")]
+            # A dictionary may cover a span of years, so match against the
+            # whole span rather than only the first year in its filename.
+            exact = [
+                item
+                for item in same_scope
+                if data.get("year") in set(item.get("years") or ())
+                or item.get("year") == data.get("year")
+            ]
             generic = [item for item in same_scope if item.get("year") is None]
             candidates = exact or generic
         else:
@@ -230,6 +276,7 @@ def generate_metadata(settings: Settings, force: bool = False) -> dict[str, obje
                 "scope": source.scope,
                 "anual_kind": source.anual_kind,
                 "year": source.year,
+                "years": sorted(source.years),
                 "source": portable_path(source.path, settings.archive),
                 "member": source.member,
                 "layout": portable_path(target, settings.archive),

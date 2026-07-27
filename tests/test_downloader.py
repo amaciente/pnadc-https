@@ -1,6 +1,79 @@
+import json
 import unittest
+from unittest import mock
 
-from pnadc_https.downloader import LinkParser, _child_url, _period_quarter, _period_year
+from pnadc_https.config import Settings
+from pnadc_https.downloader import (
+    LinkParser,
+    RemoteFile,
+    _child_url,
+    _period_quarter,
+    _period_year,
+    sync_archive,
+)
+from support import workspace
+
+
+class AdoptionTests(unittest.TestCase):
+    """An archive whose manifest is missing must not be downloaded again."""
+
+    @staticmethod
+    def _remote(size):
+        return RemoteFile(
+            survey="trimestral",
+            path="2025/PNADC_012025.zip",
+            url="https://ftp.ibge.gov.br/x/2025/PNADC_012025.zip",
+            size=size,
+            etag='"abc"',
+            last_modified="Mon, 01 Jan 2025 00:00:00 GMT",
+        )
+
+    def _sync(self, tmp_path, local_bytes, remote_size):
+        settings = Settings(archive=tmp_path / "archive")
+        local = settings.originals / "trimestral" / "2025" / "PNADC_012025.zip"
+        local.parent.mkdir(parents=True)
+        local.write_bytes(local_bytes)
+        remote = self._remote(remote_size)
+        with mock.patch(
+            "pnadc_https.downloader.discover_remote_files", return_value=[remote]
+        ):
+            return settings, sync_archive(settings)
+
+    def test_existing_file_of_the_right_size_is_adopted(self):
+        with workspace() as tmp_path:
+            settings, result = self._sync(tmp_path, b"x" * 2048, 2048)
+            self.assertEqual((result.adopted, result.downloaded), (1, 0))
+
+            manifest = json.loads(settings.manifest_path.read_text(encoding="utf-8"))
+            entry = manifest["files"]["trimestral/2025/PNADC_012025.zip"]
+            self.assertTrue(entry["adopted"])
+            self.assertEqual(entry["local"], "originals/trimestral/2025/PNADC_012025.zip")
+            self.assertIsNone(entry["sha256"])  # not read, so not claimed
+
+    def test_adopted_file_is_unchanged_on_the_next_run(self):
+        with workspace() as tmp_path:
+            settings, first = self._sync(tmp_path, b"x" * 2048, 2048)
+            self.assertEqual(first.adopted, 1)
+            with mock.patch(
+                "pnadc_https.downloader.discover_remote_files",
+                return_value=[self._remote(2048)],
+            ):
+                second = sync_archive(settings)
+            self.assertEqual((second.unchanged, second.adopted, second.downloaded), (1, 0, 0))
+
+    def test_file_of_the_wrong_size_is_not_adopted(self):
+        # A truncated or superseded local copy must still be fetched.
+        with workspace() as tmp_path:
+            settings = Settings(archive=tmp_path / "archive")
+            local = settings.originals / "trimestral" / "2025" / "PNADC_012025.zip"
+            local.parent.mkdir(parents=True)
+            local.write_bytes(b"x" * 100)
+            with mock.patch(
+                "pnadc_https.downloader.discover_remote_files",
+                return_value=[self._remote(2048)],
+            ):
+                result = sync_archive(settings, dry_run=True)
+            self.assertEqual(result.adopted, 0)
 
 
 class DownloaderTests(unittest.TestCase):

@@ -51,6 +51,7 @@ class SyncResult:
     discovered: int = 0
     downloaded: int = 0
     unchanged: int = 0
+    adopted: int = 0
     pruned: int = 0
     bytes_downloaded: int = 0
 
@@ -211,6 +212,8 @@ def discover_remote_files(
         if survey not in settings.base_urls:
             raise ValueError(f"Unknown survey: {survey}")
         for relative, url in crawl_files(client, survey, settings.base_urls[survey]):
+            if settings.is_excluded(relative):
+                continue
             lowered = relative.lower()
             shared_document = any(token in lowered for token in ("document", "dicion", "input", "layout"))
             if years and not shared_document and _period_year(relative) not in years:
@@ -268,9 +271,29 @@ def sync_archive(
 
     for remote in remotes:
         local = ensure_within(settings.originals / remote.survey / Path(remote.path), settings.originals)
-        if _is_current(remote, local, old_files.get(remote.key)):
+        recorded = old_files.get(remote.key)
+        if _is_current(remote, local, recorded):
             result.unchanged += 1
             continue
+        # A file already on disk at exactly the remote size is adopted into the
+        # manifest rather than fetched again. Without this, an archive whose
+        # manifest was lost — deleted, or never written by an older version —
+        # would be downloaded from scratch, which for PNADC means tens of
+        # gigabytes to arrive at bytes already present.
+        if recorded is None and remote.size is not None and local.is_file():
+            if local.stat().st_size == remote.size:
+                entry = asdict(remote)
+                entry.update(
+                    {
+                        "local": local.relative_to(settings.archive).as_posix(),
+                        "sha256": None,
+                        "adopted": True,
+                    }
+                )
+                new_files[remote.key] = entry
+                result.adopted += 1
+                LOG.info("Adopted existing %s (%s)", remote.key, human_size(remote.size))
+                continue
         downloads.append((remote, local))
         LOG.info("Will download %s (%s)", remote.key, human_size(remote.size))
 

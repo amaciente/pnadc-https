@@ -3,6 +3,15 @@ archive: .
 parquet: parquet
 csv: csv
 
+# Path fragments to skip everywhere: download, catalog, and conversion.
+# Projecoes_Anteriores holds population projections superseded by later
+# revisions. IBGE keeps them so previously published figures can be
+# reproduced; they are not current microdata and are 44% of the archive by
+# size. Set to [] to mirror everything, or pass --include-superseded for a
+# single run.
+exclude:
+  - Projecoes_Anteriores
+
 base_urls:
   trimestral: https://ftp.ibge.gov.br/Trabalho_e_Rendimento/Pesquisa_Nacional_por_Amostra_de_Domicilios_continua/Trimestral/Microdados/
   anual: https://ftp.ibge.gov.br/Trabalho_e_Rendimento/Pesquisa_Nacional_por_Amostra_de_Domicilios_continua/Anual/Microdados/
@@ -13,5 +22,5 @@ network:
   retries: 4
   workers: 4
   chunk_size: 1048576
-  user_agent: pnadc/0.2.0
+  user_agent: pnadc/0.3.0
 

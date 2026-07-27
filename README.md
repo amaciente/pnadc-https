@@ -200,6 +200,34 @@ finished downloads.
 remote view is partial and therefore cannot safely prove that other local
 periods were removed upstream.
 
+A file already on disk at exactly the size IBGE reports is adopted into the
+manifest rather than downloaded again, and counted as `adopted` in the
+summary. This matters when a manifest is missing — deleted, or never written
+because the archive predates it — since the alternative is re-fetching tens
+of gigabytes to arrive at bytes that are already there.
+
+#### Superseded projections are skipped by default
+
+`Projecoes_Anteriores` holds population projections that later revisions
+replaced. IBGE keeps them so previously published figures can be reproduced,
+but they are not the current microdata, and they are **44% of the archive by
+size** — 15.9 GiB of 36.4 GiB. They are therefore excluded by default:
+
+```powershell
+pnadc sync --survey both                        # 256 files, 20.5 GiB
+pnadc sync --survey both --include-superseded    # 444 files, 36.4 GiB
+```
+
+The exclusion applies to cataloging and conversion as well as downloading, so
+a copy already on disk from an earlier sync is not silently converted either.
+To change what is skipped, set `exclude` in the configuration to a list of
+path fragments:
+
+```yaml
+exclude: [Projecoes_Anteriores]   # the default
+exclude: []                        # skip nothing
+```
+
 ### Extract ZIP files
 
 Extraction is optional because conversion reads a text member directly from a

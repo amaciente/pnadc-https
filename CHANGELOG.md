@@ -7,8 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Superseded population projections (`Projecoes_Anteriores`) are excluded by
+  default. IBGE retains them so previously published figures can be
+  reproduced; they are not current microdata and are 44% of the archive by
+  size (15.9 GiB of 36.4 GiB). Pass `--include-superseded`, or set
+  `exclude: []` in the configuration, to process them. The exclusion applies
+  to cataloging and conversion as well as download, so copies already on
+  disk are not silently converted.
+- `exclude:` configuration key listing path fragments to ignore.
+- Files already present at exactly the remote size are adopted into the sync
+  manifest instead of being downloaded again. An archive whose manifest was
+  lost, or was built before manifests existed, would otherwise be fetched in
+  full. `sync` reports an `adopted` count.
+
+- `tests/test_portable_metadata.py`, including a test that builds a
+  repository, moves it, and checks that the catalog is byte-identical and
+  still resolves without reconverting.
+- CI publishes to PyPI when a GitHub Release is published, using Trusted
+  Publishing, so no API token is stored in the repository. The build fails
+  if the release tag disagrees with the version in the code, since a PyPI
+  version number cannot be reused once uploaded.
+
 ### Fixed
 
+- Annual dictionaries covering a span of years, named like
+  `dicionario_PNADC_microdados_2012_a_2014_visita1`, were read as applying to
+  2012 alone, so 2013 and 2014 microdata resolved to no dictionary and were
+  never converted. The whole span is now expanded and recorded as `years` on
+  each layout.
 - **Derived metadata was not portable.** The configuration could always be
   moved, but the files generated beside the data could not. `catalog.json`
   recorded the absolute archive root, and provenance sidecars recorded
@@ -35,19 +63,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `convert_file()` accepts `root=` to record paths relative to a repository.
   Called directly without it, absolute paths are still written, since a
   standalone conversion has no repository to be relative to.
-
-### Added
-
-- `tests/test_portable_metadata.py`, including a test that builds a
-  repository, moves it, and checks that the catalog is byte-identical and
-  still resolves without reconverting.
-- CI publishes to PyPI when a GitHub Release is published, using Trusted
-  Publishing, so no API token is stored in the repository. The build fails
-  if the release tag disagrees with the version in the code, since a PyPI
-  version number cannot be reused once uploaded.
-
-### Changed
-
 - GitHub Actions updated to `checkout@v7`, `setup-python@v7`, and
   `upload-artifact@v7`; the previous majors ran on a deprecated Node
   runtime.

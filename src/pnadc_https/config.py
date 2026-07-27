@@ -34,6 +34,14 @@ class NetworkSettings:
     user_agent: str = DEFAULT_USER_AGENT
 
 
+# Parts of the IBGE tree that are excluded unless asked for. Projecoes_Anteriores
+# holds population projections superseded by later revisions; IBGE keeps them so
+# previously published figures can be reproduced. They are not the current
+# microdata, and they are 44% of the archive by size, so a repository that mirrors
+# them by default costs far more to build than it is worth to most users.
+DEFAULT_EXCLUDE = ("Projecoes_Anteriores",)
+
+
 @dataclass(slots=True)
 class Settings:
     archive: Path = Path("archive")
@@ -41,6 +49,12 @@ class Settings:
     csv: Path | None = None
     base_urls: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_URLS))
     network: NetworkSettings = field(default_factory=NetworkSettings)
+    exclude: tuple[str, ...] = DEFAULT_EXCLUDE
+
+    def is_excluded(self, relative: str) -> bool:
+        """Report whether a repository-relative path is excluded."""
+        lowered = relative.replace("\\", "/").lower()
+        return any(token.lower() in lowered for token in self.exclude)
 
     @property
     def originals(self) -> Path:
@@ -81,6 +95,10 @@ def _merge_settings(raw: dict[str, Any], base: Path) -> Settings:
         csv = (base / csv).resolve()
     urls = dict(DEFAULT_URLS)
     urls.update(raw.get("base_urls") or {})
+    # An explicit empty list in the configuration means "exclude nothing", which
+    # is different from the key being absent.
+    raw_exclude = raw.get("exclude", None)
+    exclude = DEFAULT_EXCLUDE if raw_exclude is None else tuple(str(v) for v in raw_exclude)
     network_raw = raw.get("network") or {}
     network = NetworkSettings(
         connect_timeout=float(network_raw.get("connect_timeout", 20)),
@@ -90,7 +108,14 @@ def _merge_settings(raw: dict[str, Any], base: Path) -> Settings:
         chunk_size=max(64 * 1024, int(network_raw.get("chunk_size", 1024 * 1024))),
         user_agent=str(network_raw.get("user_agent", DEFAULT_USER_AGENT)),
     )
-    return Settings(archive=archive, parquet=parquet, csv=csv, base_urls=urls, network=network)
+    return Settings(
+        archive=archive,
+        parquet=parquet,
+        csv=csv,
+        base_urls=urls,
+        network=network,
+        exclude=exclude,
+    )
 
 
 def load_settings(config: str | Path | None = None, archive: str | Path | None = None) -> Settings:

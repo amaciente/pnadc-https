@@ -63,8 +63,12 @@ class Repository:
         config: str | Path | None = None,
         *,
         archive: str | Path | None = None,
+        include_superseded: bool = False,
     ) -> None:
         self.settings: Settings = load_settings(config, archive)
+        if include_superseded:
+            # Process Projecoes_Anteriores too; see config.DEFAULT_EXCLUDE.
+            self.settings.exclude = ()
 
     def sync(
         self,

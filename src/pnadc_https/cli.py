@@ -27,12 +27,25 @@ def _years(values: list[int] | None) -> set[int] | None:
 
 
 def _settings(args: argparse.Namespace):
-    return load_settings(args.config, args.archive)
+    settings = load_settings(args.config, args.archive)
+    if getattr(args, "include_superseded", False):
+        settings.exclude = ()
+    return settings
 
 
 def _add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--config", type=Path, help="YAML configuration file")
     parser.add_argument("--archive", type=Path, help="Override archive directory")
+    parser.add_argument(
+        "--include-superseded",
+        action="store_true",
+        help=(
+            "also process Projecoes_Anteriores, the superseded population "
+            "projections IBGE retains for reproducing previously published "
+            "figures; excluded by default because they are not current "
+            "microdata and account for most of the archive by size"
+        ),
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -161,7 +174,8 @@ def run(args: argparse.Namespace) -> int:
         )
         print(
             f"Discovered {result.discovered}; downloaded {result.downloaded}; "
-            f"unchanged {result.unchanged}; pruned {result.pruned}; "
+            f"unchanged {result.unchanged}; adopted {result.adopted}; "
+            f"pruned {result.pruned}; "
             f"transferred {human_size(result.bytes_downloaded)}."
         )
     elif args.command == "extract":
