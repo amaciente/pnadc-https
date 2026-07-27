@@ -75,7 +75,7 @@ pnadc doctor
 ```
 
 If your shell reports that `pnadc` is not found, the scripts directory is not
-on your `PATH`; `python -m pnadc` works identically and always resolves.
+on your `PATH`; `python -m pnadc_https` works identically and always resolves.
 
 ## Create a repository
 
@@ -379,5 +379,5 @@ Parquet. Commands never commit, upload, or transmit local microdata elsewhere.
 
 ```powershell
 python -m unittest discover -s tests -v
-python -m pnadc --help
+python -m pnadc_https --help
 ```

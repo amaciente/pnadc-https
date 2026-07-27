@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from zipfile import ZipFile
 
-from pnadc.extract import extract_zip
+from pnadc_https.extract import extract_zip
 from support import workspace
 
 

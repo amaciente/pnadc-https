@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pnadc"
+name = "pnadc-https"
 dynamic = ["version"]
 description = "Maintain local, standardized repositories of IBGE PNAD Continua microdata"
 readme = "README.md"
@@ -40,14 +40,14 @@ dev = ["build>=1.2", "pytest>=8", "twine>=5"]
 all = ["pandas>=2.0"]
 
 [project.scripts]
-pnadc = "pnadc.cli:main"
+pnadc = "pnadc_https.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# The version is declared once, in src/pnadc/_version.py.
+# The version is declared once, in src/pnadc_https/_version.py.
 [tool.setuptools.dynamic]
-version = {attr = "pnadc._version.__version__"}
+version = {attr = "pnadc_https._version.__version__"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

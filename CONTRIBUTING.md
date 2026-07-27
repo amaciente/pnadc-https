@@ -37,7 +37,7 @@ fast to run repeatedly.
 
 ## Project layout
 
-- `src/pnadc/` — the package. `config.py` resolves settings and paths,
+- `src/pnadc_https/` — the package. `config.py` resolves settings and paths,
   `downloader.py` mirrors IBGE over HTTPS, `layouts.py` parses dictionaries,
   `metadata.py` builds the catalog, `convert.py` writes Parquet/CSV,
   `panel.py` builds person panels, `repository.py` is the public Python API,

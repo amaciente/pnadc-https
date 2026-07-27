@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pnadc import Repository, __version__, init_repository
+from pnadc_https import Repository, __version__, init_repository
 
 
 class RepositoryApiTests(unittest.TestCase):
@@ -28,9 +28,9 @@ class RepositoryApiTests(unittest.TestCase):
                 init_repository(root)
 
     def test_version_is_single_sourced(self):
-        # pyproject.toml reads pnadc._version.__version__, and the default
+        # pyproject.toml reads pnadc_https._version.__version__, and the default
         # user agent is derived from it, so nothing can drift out of step.
-        from pnadc.config import DEFAULT_USER_AGENT, NetworkSettings
+        from pnadc_https.config import DEFAULT_USER_AGENT, NetworkSettings
 
         self.assertEqual(DEFAULT_USER_AGENT, f"pnadc/{__version__}")
         self.assertEqual(NetworkSettings().user_agent, f"pnadc/{__version__}")

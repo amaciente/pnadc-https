@@ -5,9 +5,9 @@ from zipfile import ZipFile
 import pyarrow.parquet as pq
 from openpyxl import Workbook
 
-from pnadc.config import Settings
-from pnadc.convert import convert_catalog
-from pnadc.metadata import generate_metadata
+from pnadc_https.config import Settings
+from pnadc_https.convert import convert_catalog
+from pnadc_https.metadata import generate_metadata
 from support import workspace
 
 

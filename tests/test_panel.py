@@ -4,7 +4,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from pnadc.panel import build_panel
+from pnadc_https.panel import build_panel
 from support import workspace
 
 

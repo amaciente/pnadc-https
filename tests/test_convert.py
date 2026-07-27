@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-from pnadc.convert import convert_file, simplified_output_stem
+from pnadc_https.convert import convert_file, simplified_output_stem
 from support import workspace
 
 

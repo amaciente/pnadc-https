@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from pnadc.config import load_settings
+from pnadc_https.config import load_settings
 from support import workspace
 
 

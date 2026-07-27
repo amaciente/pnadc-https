@@ -1,6 +1,6 @@
 import unittest
 
-from pnadc.downloader import LinkParser, _child_url, _period_quarter, _period_year
+from pnadc_https.downloader import LinkParser, _child_url, _period_quarter, _period_year
 
 
 class DownloaderTests(unittest.TestCase):

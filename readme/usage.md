@@ -47,7 +47,7 @@ Unknown columns fail immediately. Existing outputs are skipped unless
 ## Python API
 
 ```python
-from pnadc import Repository
+from pnadc_https import Repository
 
 repo = Repository(r"C:\data\pnadc\pnadc.yml")
 

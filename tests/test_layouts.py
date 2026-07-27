@@ -1,6 +1,6 @@
 import unittest
 
-from pnadc.layouts import parse_rows
+from pnadc_https.layouts import parse_rows
 
 
 class LayoutTests(unittest.TestCase):
