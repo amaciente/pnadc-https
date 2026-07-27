@@ -60,6 +60,19 @@ fast to run repeatedly.
 - Add a test with any behaviour change, and a `CHANGELOG.md` entry under
   `## [Unreleased]`.
 
+## Releasing
+
+1. Update the version in `src/pnadc_https/_version.py` and move the
+   `## [Unreleased]` changelog entries under the new version heading.
+2. Commit, then tag: `git tag -a vX.Y.Z -m "Version X.Y.Z"` and push both.
+3. Publish a GitHub Release from that tag, pasting in the changelog section.
+
+Publishing the release triggers CI to upload the distribution to PyPI
+through Trusted Publishing, after the full test matrix passes. The build
+refuses to continue if the tag and the version in the code disagree, because
+a version number cannot be re-uploaded to PyPI once it has been used —
+publishing the wrong thing is not correctable, only superseded.
+
 ## Scope
 
 This project maintains a local, standardized copy of PNAD Contínua and stops

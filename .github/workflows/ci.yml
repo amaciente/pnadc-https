@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -18,10 +20,10 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -41,9 +43,9 @@ jobs:
     name: Build distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -55,7 +57,46 @@ jobs:
       - name: Verify package metadata
         run: python -m twine check dist/*
 
-      - uses: actions/upload-artifact@v4
+      # A release tag that disagrees with the version in the code would
+      # publish something other than what the tag claims. Fail before that
+      # can reach PyPI, where a version number can never be reused.
+      - name: Check the built version matches the release tag
+        if: github.event_name == 'release'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          built=$(ls dist/*.tar.gz | sed -E 's/.*-([0-9][^-]*)\.tar\.gz/\1/')
+          echo "release tag: $tag / built version: $built"
+          if [ "$tag" != "$built" ]; then
+            echo "::error::Release tag $GITHUB_REF_NAME does not match built version $built"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v7
         with:
           name: distribution
           path: dist/
+
+  publish:
+    name: Publish to PyPI
+    # Only when a GitHub Release is published, and only once the full matrix
+    # has passed. Publishing is irreversible: a version cannot be re-uploaded
+    # to PyPI even after being deleted.
+    if: github.event_name == 'release'
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pnadc-https
+    permissions:
+      # Required for Trusted Publishing: GitHub mints a short-lived OIDC
+      # token that PyPI verifies, so there is no API token to store or leak.
+      id-token: write
+    steps:
+      - name: Download the distribution built above
+        uses: actions/download-artifact@v8
+        with:
+          name: distribution
+          path: dist/
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@v1.14.1

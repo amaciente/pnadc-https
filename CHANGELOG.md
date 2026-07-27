@@ -41,6 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tests/test_portable_metadata.py`, including a test that builds a
   repository, moves it, and checks that the catalog is byte-identical and
   still resolves without reconverting.
+- CI publishes to PyPI when a GitHub Release is published, using Trusted
+  Publishing, so no API token is stored in the repository. The build fails
+  if the release tag disagrees with the version in the code, since a PyPI
+  version number cannot be reused once uploaded.
+
+### Changed
+
+- GitHub Actions updated to `checkout@v7`, `setup-python@v7`, and
+  `upload-artifact@v7`; the previous majors ran on a deprecated Node
+  runtime.
 
 ## [0.3.0] - 2026-07-27
 
