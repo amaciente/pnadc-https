@@ -89,6 +89,48 @@ pnadc doctor
 If your shell reports that `pnadc` is not found, the scripts directory is not
 on your `PATH`; `python -m pnadc_https` works identically and always resolves.
 
+### If `pnadc` reports "Access is denied" (managed Windows)
+
+Some corporate machines run application control (AppLocker, or an endpoint
+security agent) that blocks newly created, unsigned `.exe` files. Because
+`pip` installs console scripts as small generated `.exe` launchers, `pnadc`
+can be blocked while long-established tools such as `pip.exe` in the same
+directory keep working. Nothing is wrong with the installation — only the
+launcher is blocked.
+
+`python -m pnadc_https` is unaffected and takes exactly the same arguments:
+
+```
+python -m pnadc_https doctor
+```
+
+To keep the short command, replace the launcher with a batch shim, which is
+not an executable and is therefore not blocked. Note that Windows resolves
+`.EXE` before `.CMD`, so the blocked launcher has to be moved aside or the
+shim will never be reached. In PowerShell, with the target environment
+active:
+
+```powershell
+$launcher = (Get-Command pnadc).Source
+$scripts = Split-Path $launcher
+$python = (Get-Command python).Source
+Move-Item $launcher "$launcher.blocked" -Force
+Set-Content "$scripts\pnadc.cmd" -Encoding ascii -Value @"
+@echo off
+"$python" -m pnadc_https %*
+"@
+```
+
+The paths are derived from the launcher rather than assumed, because `conda`
+keeps `python.exe` in the environment root while `venv` keeps it in
+`Scripts`.
+
+Reinstalling or upgrading the package recreates `pnadc.exe`, which will
+shadow the shim again; re-run the snippet if that happens. The durable fix is
+to ask whoever administers the machine to allow executables under your Python
+environment's `Scripts` directory, since this affects every Python
+command-line tool, not only this one.
+
 ## Create a repository
 
 A repository is just a directory. Create one anywhere you have space —
