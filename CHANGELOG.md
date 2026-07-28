@@ -66,10 +66,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI installs the built wheel into a clean environment and exercises the
   import, `python -m`, and console-script entry points, which an editable
   checkout cannot catch.
-
-
-### Added
-
 - Superseded population projections (`Projecoes_Anteriores`) are excluded by
   default. IBGE retains them so previously published figures can be
   reproduced; they are not current microdata and are 44% of the archive by
