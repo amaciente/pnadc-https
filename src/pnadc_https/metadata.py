@@ -137,6 +137,14 @@ def _microdata_sources(settings: Settings) -> list[dict[str, object]]:
     for path in sorted(settings.originals.rglob("*.zip")):
         if settings.is_excluded(path.relative_to(settings.originals).as_posix()):
             continue
+        # A documentation archive is not microdata even though it ships a
+        # .txt member: Dicionario_e_input_*.zip carries the SAS reading
+        # program, which is Latin-1 prose, not fixed-width records.
+        if any(
+            token in path.name.lower()
+            for token in ("dicion", "input", "document", "deflator")
+        ):
+            continue
         try:
             with ZipFile(path) as archive:
                 members = [

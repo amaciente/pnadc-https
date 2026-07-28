@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A documentation archive was cataloged as microdata.**
+  `Dicionario_e_input_*.zip` ships the SAS reading program as a `.txt`
+  member, and any ZIP holding a text member was treated as data. Converting
+  it failed with `'utf-8' codec can't decode byte 0xcd`, because that program
+  is Latin-1 prose rather than fixed-width records. Archives named as
+  dictionaries, inputs, documentation, or deflators are no longer cataloged.
+- **One unconvertible file aborted the whole batch.** A `convert-many` over
+  the full archive now reports the failure and continues, rather than
+  discarding the work still queued behind it.
+- A decode failure now names the file and member, and suggests
+  `--encoding latin-1`, instead of surfacing a bare codec error.
+
 ### Added
 
 - `output_layout: flat` arranges converted files the way `pynad` does: one
@@ -15,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pnadc.microdados.anual.visita1.2012.parquet`). Convenient for reading a
   whole series with one glob. The nested `<survey>/<year>/` layout remains the
   default, since switching relocates every existing output.
+- With `output_layout: flat`, conversion also writes
+  `pnadc.microdados.dicionarios.json`, the index `pynad` reads to discover
+  converted files. A repository built here can therefore be handed to `pynad`
+  for panel assembly as though `pynad` had produced it, without
+  re-downloading or re-converting anything.
 
 ## [0.4.0] - 2026-07-28
 

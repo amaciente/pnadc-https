@@ -115,6 +115,41 @@ def _preferred_revisions(
     return list(chosen.values())
 
 
+# The index `pynad` reads to discover converted files. It lives beside them,
+# holds one JSON object per line, and is keyed by filename and size.
+PYNAD_INDEX_NAME = "pnadc.microdados.dicionarios.json"
+
+
+def write_pynad_index(directory: Path, sources: dict[str, list[str]] | None = None) -> Path:
+    """Write the file index `pynad` expects beside converted Parquet files.
+
+    `pynad`'s panel stage reads this index rather than listing the directory,
+    selecting files by the ``.trimestral.``/``.anual.visita``/
+    ``.anual.trimestre`` markers in each name and taking the period from the
+    name's last components. Writing it means `pynad` can assemble panels from
+    a repository this package produced, without re-downloading or
+    re-converting anything.
+
+    One JSON object per line, as `pynad` writes and reads it.
+    """
+    lines = []
+    for parquet in sorted(directory.glob("*.parquet")):
+        record = {
+            "name": parquet.name,
+            "size": parquet.stat().st_size,
+            # `pynad` only reads name and size here; the origin is recorded
+            # for the reader's benefit.
+            "files": (sources or {}).get(parquet.name, []),
+        }
+        lines.append(json.dumps(record, ensure_ascii=False))
+    target = directory / PYNAD_INDEX_NAME
+    temporary = target.with_name(target.name + ".part")
+    temporary.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    os.replace(temporary, target)
+    LOG.info("Wrote %s describing %d file(s)", target.name, len(lines))
+    return target
+
+
 def _recorded_provenance(
     provenance_path: Path, legacy_path: Path
 ) -> dict[str, object] | None:
@@ -387,13 +422,29 @@ def convert_file(
     variables = _select_variables(layout, columns)
     name_to_index = {variable.name: index for index, variable in enumerate(layout.variables)}
     indices = [name_to_index[variable.name] for variable in variables]
-    with open_fixed_width(source_path, member, encoding) as stream:
-        if target.suffix.lower() == ".csv":
-            rows = _write_csv(stream, layout, variables, indices, temporary)
-        elif target.suffix.lower() in (".parquet", ".pq"):
-            rows = _write_parquet(stream, layout, variables, indices, temporary, max(1, chunk_rows), all_string)
-        else:
-            raise ValueError("Output extension must be .csv or .parquet")
+    try:
+        with open_fixed_width(source_path, member, encoding) as stream:
+            if target.suffix.lower() == ".csv":
+                rows = _write_csv(stream, layout, variables, indices, temporary)
+            elif target.suffix.lower() in (".parquet", ".pq"):
+                rows = _write_parquet(stream, layout, variables, indices, temporary, max(1, chunk_rows), all_string)
+            else:
+                raise ValueError("Output extension must be .csv or .parquet")
+    except UnicodeDecodeError as exc:
+        temporary.unlink(missing_ok=True)
+        raise UnicodeDecodeError(
+            exc.encoding,
+            exc.object,
+            exc.start,
+            exc.end,
+            (
+                f"{exc.reason} while reading {source_path.name}"
+                f"{f' member {member}' if member else ''} as {encoding}. "
+                "IBGE ships some text in Latin-1; if this really is microdata, "
+                "retry with --encoding latin-1. If it is documentation rather "
+                "than a data file, it should not be in the catalog"
+            ),
+        ) from None
     os.replace(temporary, target)
     output_format = "csv" if target.suffix.lower() == ".csv" else "parquet"
     # Paths are stored relative to the repository root where possible, so the
@@ -446,6 +497,7 @@ def convert_catalog(
     if catalog is None:
         raise FileNotFoundError("Metadata catalog not found; run `pnadc metadata` first")
     converted = skipped = unresolved = 0
+    produced: dict[str, list[str]] = {}
     for record in _preferred_revisions(catalog.get("microdata", []), output_format, settings):
         if scope and record.get("scope") != scope:
             continue
@@ -484,6 +536,7 @@ def convert_catalog(
         expected = conversion_fingerprint(
             source, layout_path, columns, all_string, output_format
         )
+        produced[target.name] = [record["source"], str(layout_relative)]
         legacy_provenance = target_dir / f"{source.stem}.{output_format}.provenance.json"
         if target.exists() and not force:
             recorded = _recorded_provenance(provenance_path, legacy_provenance)
@@ -491,17 +544,34 @@ def convert_catalog(
                 skipped += 1
                 continue
             LOG.info("Reconverting %s; its inputs or options changed", target.name)
-        convert_file(
-            source,
-            layout_path,
-            target,
-            member=record.get("member"),
-            force=True,
-            all_string=all_string,
-            provenance_path=provenance_path,
-            columns=columns,
-            root=settings.archive,
-        )
+        try:
+            convert_file(
+                source,
+                layout_path,
+                target,
+                member=record.get("member"),
+                force=True,
+                all_string=all_string,
+                provenance_path=provenance_path,
+                columns=columns,
+                root=settings.archive,
+            )
+        except (UnicodeDecodeError, ValueError, OSError) as exc:
+            # One unconvertible file must not discard the work queued behind
+            # it. Report it the way an unresolved layout is reported and move
+            # on; a batch over a whole archive is too long to restart because
+            # of a single bad record.
+            unresolved += 1
+            LOG.error("Could not convert %s: %s", record["source"], exc)
+            continue
         converted += 1
         LOG.info("Converted %s", source)
+    if unresolved:
+        LOG.warning(
+            "%d file(s) produced no output; see the messages above", unresolved
+        )
+    # The flat layout exists to be interchangeable with `pynad`, which needs
+    # this index to find the files at all.
+    if settings.output_layout == "flat" and output_format == "parquet":
+        write_pynad_index(output_root, produced)
     return converted, skipped, unresolved
