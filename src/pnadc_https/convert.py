@@ -68,7 +68,9 @@ def _revision_key(name: str) -> str:
 
 
 def _preferred_revisions(
-    records: Iterable[dict[str, object]], output_format: str
+    records: Iterable[dict[str, object]],
+    output_format: str,
+    settings: "Settings | None" = None,
 ) -> list[dict[str, object]]:
     """Keep one catalog record per output file: the newest revision.
 
@@ -79,15 +81,21 @@ def _preferred_revisions(
     report two conversions for one output, and leave whichever happened to
     run last, which is not necessarily the newer data.
     """
+    flat = settings is not None and settings.output_layout == "flat"
     chosen: dict[tuple, dict[str, object]] = {}
     for record in records:
         source = Path(str(record.get("source", "")))
-        key = (
-            record.get("scope"),
-            source.parent.as_posix(),
-            simplified_output_stem(source.stem),
-            output_format,
-        )
+        # Group by the output that would be written, which is what can
+        # collide, and which differs between the two layouts.
+        if flat:
+            key = (pynad_output_stem(source.name, record.get("scope")), output_format)
+        else:
+            key = (
+                record.get("scope"),
+                source.parent.as_posix(),
+                simplified_output_stem(source.stem),
+                output_format,
+            )
         best = chosen.get(key)
         if best is None:
             chosen[key] = record
@@ -145,6 +153,54 @@ def _is_current(recorded: dict[str, object] | None, expected: dict[str, object])
 def simplified_output_stem(source_stem: str) -> str:
     """Remove a trailing IBGE revision date from a converted data filename."""
     return re.sub(r"_20\d{6}$", "", source_stem, flags=re.IGNORECASE)
+
+
+def pynad_output_stem(source_name: str, scope: str | None) -> str:
+    """Name an output the way `pynad` does, for a single flat directory.
+
+    `pynad` keeps every converted file in one folder, named so that the
+    survey, period, and edition are all in the filename and sort sensibly:
+
+        PNADC_012012_20250815.zip     -> pnadc.microdados.trimestral.2012.1
+        PNADC_2012_visita1_...zip     -> pnadc.microdados.anual.visita1.2012
+        PNADC_2023_trimestre1.zip     -> pnadc.microdados.anual.trimestre1.2023
+
+    Falling back to the plain stem keeps an unrecognised filename usable
+    rather than silently mangled.
+    """
+    stem = simplified_output_stem(Path(source_name).stem)
+    survey = "anual" if scope == "anual" else "trimestral"
+    quarterly = re.fullmatch(r"PNADC_(0?[1-4])(20\d{2})", stem, flags=re.IGNORECASE)
+    if quarterly:
+        quarter, year = quarterly.group(1).lstrip("0"), quarterly.group(2)
+        return f"pnadc.microdados.trimestral.{year}.{quarter}"
+    annual = re.fullmatch(
+        r"PNADC_(20\d{2})_(visita\d|trimestre\d)", stem, flags=re.IGNORECASE
+    )
+    if annual:
+        return f"pnadc.microdados.anual.{annual.group(2).lower()}.{annual.group(1)}"
+    return f"pnadc.microdados.{survey}.{stem.lower()}"
+
+
+def output_location(
+    record: dict[str, object],
+    source: Path,
+    settings: Settings,
+    output_root: Path,
+    output_format: str,
+) -> tuple[Path, str]:
+    """Return the directory and stem for a converted file."""
+    scope = str(record.get("scope") or "unknown")
+    if settings.output_layout == "flat":
+        # One directory for everything, as `pynad` does: simple to glob, and
+        # the period is carried by the filename rather than the path.
+        return output_root, pynad_output_stem(source.name, record.get("scope"))
+    source_root = settings.originals / scope
+    try:
+        source_parent = source.relative_to(source_root).parent
+    except ValueError:
+        source_parent = Path()
+    return output_root / scope / source_parent, simplified_output_stem(source.stem)
 
 
 @contextmanager
@@ -390,7 +446,7 @@ def convert_catalog(
     if catalog is None:
         raise FileNotFoundError("Metadata catalog not found; run `pnadc metadata` first")
     converted = skipped = unresolved = 0
-    for record in _preferred_revisions(catalog.get("microdata", []), output_format):
+    for record in _preferred_revisions(catalog.get("microdata", []), output_format, settings):
         if scope and record.get("scope") != scope:
             continue
         if years and record.get("year") not in years:
@@ -415,13 +471,10 @@ def convert_catalog(
             continue
         source = ensure_within(settings.archive / Path(record["source"]), settings.archive)
         layout_path = ensure_within(settings.archive / Path(layout_relative), settings.archive)
-        source_root = settings.originals / str(record.get("scope") or "unknown")
-        try:
-            source_parent = source.relative_to(source_root).parent
-        except ValueError:
-            source_parent = Path()
-        target_dir = output_root / str(record.get("scope") or "unknown") / source_parent
-        target = target_dir / f"{simplified_output_stem(source.stem)}.{output_format}"
+        target_dir, target_stem = output_location(
+            record, source, settings, output_root, output_format
+        )
+        target = target_dir / f"{target_stem}.{output_format}"
         # Named after the output, not the source: IBGE revisions differ only
         # by a filename suffix that simplified_output_stem removes, so several
         # sources map to one output. Keying provenance to the source would

@@ -3,6 +3,13 @@ archive: .
 parquet: parquet
 csv: csv
 
+# How converted files are arranged.
+#   nested  <survey>/<year>/PNADC_012012.parquet          (default)
+#   flat    pnadc.microdados.trimestral.2012.1.parquet    (as `pynad` names them)
+# Changing this moves every output; convert into an empty directory or expect
+# a full reconversion.
+output_layout: nested
+
 # Path fragments to skip everywhere: download, catalog, and conversion.
 # Projecoes_Anteriores holds population projections superseded by later
 # revisions. IBGE keeps them so previously published figures can be

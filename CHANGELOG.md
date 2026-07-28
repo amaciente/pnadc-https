@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `output_layout: flat` arranges converted files the way `pynad` does: one
+  directory, with the survey, period and edition in the filename
+  (`pnadc.microdados.trimestral.2012.1.parquet`,
+  `pnadc.microdados.anual.visita1.2012.parquet`). Convenient for reading a
+  whole series with one glob. The nested `<survey>/<year>/` layout remains the
+  default, since switching relocates every existing output.
+
 ## [0.4.0] - 2026-07-28
 
 ### Fixed

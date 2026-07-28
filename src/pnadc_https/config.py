@@ -50,6 +50,9 @@ class Settings:
     base_urls: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_URLS))
     network: NetworkSettings = field(default_factory=NetworkSettings)
     exclude: tuple[str, ...] = DEFAULT_EXCLUDE
+    # "nested" mirrors the IBGE tree as <survey>/<year>/...; "flat" puts every
+    # converted file in one directory named the way `pynad` names them.
+    output_layout: str = "nested"
 
     def is_excluded(self, relative: str) -> bool:
         """Report whether a repository-relative path is excluded."""
@@ -130,6 +133,11 @@ def _merge_settings(raw: dict[str, Any], base: Path) -> Settings:
         chunk_size=max(64 * 1024, int(network_raw.get("chunk_size", 1024 * 1024))),
         user_agent=str(network_raw.get("user_agent", DEFAULT_USER_AGENT)),
     )
+    layout = str(raw.get("output_layout", "nested")).lower()
+    if layout not in ("nested", "flat"):
+        raise ValueError(
+            f"output_layout must be 'nested' or 'flat', got {layout!r}"
+        )
     return Settings(
         archive=archive,
         parquet=parquet,
@@ -137,6 +145,7 @@ def _merge_settings(raw: dict[str, Any], base: Path) -> Settings:
         base_urls=urls,
         network=network,
         exclude=exclude,
+        output_layout=layout,
     )
 
 
