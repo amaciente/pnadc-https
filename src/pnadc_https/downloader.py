@@ -139,7 +139,15 @@ def _child_url(root: str, current: str, href: str) -> str | None:
     clean = urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
     if parts.scheme != "https" or parts.netloc != root_parts.netloc:
         return None
-    if not unquote(parts.path).startswith(unquote(root_parts.path)):
+    decoded = unquote(parts.path)
+    if not decoded.startswith(unquote(root_parts.path)):
+        return None
+    # urljoin resolves "../" but not its encoded form, so "..%2F..%2Fx" arrives
+    # here still looking contained and only decodes to a traversal later, when
+    # the local path is derived. ensure_within would catch it at that point,
+    # but by aborting the whole synchronization rather than ignoring one bad
+    # link. Reject it here instead.
+    if ".." in PurePosixPath(decoded).parts:
         return None
     if clean == current or clean.rstrip("/") == root.rstrip("/"):
         return None

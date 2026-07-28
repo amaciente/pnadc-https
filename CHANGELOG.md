@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Encoded path traversal in a directory listing (`..%2F..%2F`) was accepted by
+  the crawler's containment check, which compared the decoded path without
+  normalising it. `ensure_within` still caught it before anything was written,
+  but by aborting the whole synchronization rather than ignoring one bad link.
+  It is now rejected during discovery.
 - Annual dictionaries covering a span of years, named like
   `dicionario_PNADC_microdados_2012_a_2014_visita1`, were read as applying to
   2012 alone, so 2013 and 2014 microdata resolved to no dictionary and were
