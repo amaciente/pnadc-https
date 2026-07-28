@@ -90,7 +90,7 @@ table = data.to_table(columns=["ano", "trimestre", "uf", "v1028", "vd4002"])
 
 ## Panels
 
-Install `pnadc[panel]`, then pass two to five consecutive quarterly files:
+Install `pnadc-https[panel]`, then pass two to five consecutive quarterly files:
 
 ```powershell
 pnadc panel 2012Q1.parquet 2012Q2.parquet 2012Q3.parquet `

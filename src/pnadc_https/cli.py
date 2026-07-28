@@ -13,7 +13,7 @@ from pathlib import Path
 from . import __version__
 from .config import load_settings
 from .convert import convert_catalog, convert_file
-from .downloader import sync_archive
+from .downloader import sync_archive, verify_archive
 from .extract import extract_archive
 from .layouts import load_layout, write_layout
 from .metadata import generate_metadata
@@ -29,7 +29,7 @@ def _years(values: list[int] | None) -> set[int] | None:
 def _settings(args: argparse.Namespace):
     settings = load_settings(args.config, args.archive)
     if getattr(args, "include_superseded", False):
-        settings.exclude = ()
+        settings.exclude = settings.including_superseded()
     return settings
 
 
@@ -119,6 +119,17 @@ def build_parser() -> argparse.ArgumentParser:
     update.add_argument("--format", choices=("parquet", "csv"), default="parquet", help="output format used when --convert is set")
     update.add_argument("--all-string", action="store_true", help="store every Parquet field as text (ignored for --format csv)")
     update.add_argument("--columns", action="append", help="keep only this layout variable (repeatable); default keeps all")
+
+    verify = sub.add_parser("verify", help="check mirrored files against the sync manifest")
+    _add_common(verify)
+    verify.add_argument(
+        "--deep",
+        action="store_true",
+        help=(
+            "also CRC-check every member of adopted ZIP archives, which were "
+            "taken on trust from their size and so carry no recorded hash"
+        ),
+    )
 
     doctor = sub.add_parser("doctor", help="report interpreter and dependency readiness")
     _add_common(doctor)
@@ -236,6 +247,20 @@ def run(args: argparse.Namespace) -> int:
                 columns=args.columns,
             )
             print(f"Converted {converted}; skipped {skipped}; unresolved layouts {unresolved}.")
+    elif args.command == "verify":
+        result = verify_archive(_settings(args), deep=args.deep)
+        print(
+            f"Checked {result.checked}; verified {result.ok}; "
+            f"unverifiable {result.unverifiable}; failed {len(result.failed)}."
+        )
+        for problem in result.failed:
+            print(f"  {problem}", file=sys.stderr)
+        if result.unverifiable and not args.deep:
+            print(
+                "Adopted files have no recorded hash; re-run with --deep to "
+                "CRC-check their contents.",
+            )
+        return 1 if result.failed else 0
     elif args.command == "doctor":
         return _doctor(args)
     return 0

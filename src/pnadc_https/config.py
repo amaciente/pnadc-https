@@ -56,6 +56,15 @@ class Settings:
         lowered = relative.replace("\\", "/").lower()
         return any(token.lower() in lowered for token in self.exclude)
 
+    def including_superseded(self) -> tuple[str, ...]:
+        """Return the exclusions with only the superseded-projection default removed.
+
+        Dropping every exclusion would silently discard whatever the user
+        configured for their own reasons, so only the entries this package
+        adds by default are taken out.
+        """
+        return tuple(token for token in self.exclude if token not in DEFAULT_EXCLUDE)
+
     @property
     def originals(self) -> Path:
         return self.archive / "originals"
@@ -98,7 +107,20 @@ def _merge_settings(raw: dict[str, Any], base: Path) -> Settings:
     # An explicit empty list in the configuration means "exclude nothing", which
     # is different from the key being absent.
     raw_exclude = raw.get("exclude", None)
-    exclude = DEFAULT_EXCLUDE if raw_exclude is None else tuple(str(v) for v in raw_exclude)
+    if raw_exclude is None:
+        exclude = DEFAULT_EXCLUDE
+    elif isinstance(raw_exclude, (str, bytes)) or not isinstance(raw_exclude, (list, tuple)):
+        # A bare string iterates character by character, which would silently
+        # exclude almost everything: "exclude: Projecoes_Anteriores" would
+        # match any path containing "r". Refuse it rather than obey it.
+        raise ValueError(
+            "exclude must be a YAML list of path fragments, for example:\n"
+            "  exclude:\n"
+            "    - Projecoes_Anteriores\n"
+            f"got {type(raw_exclude).__name__}: {raw_exclude!r}"
+        )
+    else:
+        exclude = tuple(str(item) for item in raw_exclude)
     network_raw = raw.get("network") or {}
     network = NetworkSettings(
         connect_timeout=float(network_raw.get("connect_timeout", 20)),

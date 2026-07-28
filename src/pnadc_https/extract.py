@@ -56,16 +56,31 @@ def extract_archive(settings: Settings, force: bool = False) -> tuple[int, int]:
     for source in sorted(settings.originals.rglob("*.zip")):
         relative = source.relative_to(settings.originals)
         key = relative.as_posix()
+        if settings.is_excluded(key):
+            continue
         fingerprint = _source_fingerprint(source)
-        if not force and records.get(key, {}).get("source") == fingerprint:
+        previous = records.get(key, {})
+        if not force and previous.get("source") == fingerprint:
             skipped += 1
             continue
         target = settings.archive / "extracted" / relative.with_suffix("")
-        outputs = extract_zip(source, target, force=force)
-        records[key] = {
-            "source": fingerprint,
-            "outputs": [path.relative_to(settings.archive).as_posix() for path in outputs],
-        }
+        # Reaching this point means the archive is new, changed, or a rebuild
+        # was demanded, so its members are always rewritten. Extracting with
+        # force=False here would keep the previous revision's files while
+        # recording the new fingerprint, leaving the repository permanently
+        # convinced that stale content is current.
+        outputs = extract_zip(source, target, force=True)
+        current = [path.relative_to(settings.archive).as_posix() for path in outputs]
+        # Members dropped from the new revision would otherwise survive
+        # indefinitely alongside the files that replaced them.
+        for stale in set(previous.get("outputs") or ()) - set(current):
+            obsolete = settings.archive / Path(stale)
+            try:
+                ensure_within(obsolete, settings.archive / "extracted").unlink(missing_ok=True)
+                LOG.info("Removed extracted member no longer in %s: %s", relative, stale)
+            except ValueError:
+                LOG.warning("Refusing to remove path outside the archive: %s", stale)
+        records[key] = {"source": fingerprint, "outputs": current}
         processed += 1
         LOG.info("Extracted %s", relative)
     atomic_json(state_path, state)

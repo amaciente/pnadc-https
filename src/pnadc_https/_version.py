@@ -7,4 +7,4 @@ reads the same attribute, so the version is declared exactly once.
 
 from __future__ import annotations
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

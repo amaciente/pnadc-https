@@ -53,10 +53,58 @@ def conversion_fingerprint(
         "source_mtime_ns": stat.st_mtime_ns,
         "layout_sha256": sha256_file(layout_path),
         "columns": sorted(name.lower() for name in columns) if columns is not None else None,
-        "all_string": all_string,
+        # CSV is written as raw text, so all_string cannot change its content;
+        # including it would reconvert an identical file when the flag flips.
+        "all_string": all_string if output_format != "csv" else None,
         "output_format": output_format,
         "conversion_format_version": CONVERSION_FORMAT_VERSION,
     }
+
+
+def _revision_key(name: str) -> str:
+    """Return the trailing IBGE revision date, or empty when there is none."""
+    match = re.search(r"_(20\d{6})$", Path(name).stem, flags=re.IGNORECASE)
+    return match.group(1) if match else ""
+
+
+def _preferred_revisions(
+    records: Iterable[dict[str, object]], output_format: str
+) -> list[dict[str, object]]:
+    """Keep one catalog record per output file: the newest revision.
+
+    ``PNADC_012012_20250815.zip`` and ``PNADC_012012_20260701.zip`` both
+    produce ``PNADC_012012.parquet``. Synchronization does not delete a
+    superseded revision — only ``--prune`` does, and it is opt-in — so both
+    can sit on disk. Converting each in turn would write the file twice,
+    report two conversions for one output, and leave whichever happened to
+    run last, which is not necessarily the newer data.
+    """
+    chosen: dict[tuple, dict[str, object]] = {}
+    for record in records:
+        source = Path(str(record.get("source", "")))
+        key = (
+            record.get("scope"),
+            source.parent.as_posix(),
+            simplified_output_stem(source.stem),
+            output_format,
+        )
+        best = chosen.get(key)
+        if best is None:
+            chosen[key] = record
+            continue
+        # Prefer the later revision date; fall back to the longer name so a
+        # dated release beats an undated one rather than depending on order.
+        current_key = (_revision_key(source.name), source.name)
+        best_source = Path(str(best.get("source", "")))
+        best_key = (_revision_key(best_source.name), best_source.name)
+        if current_key > best_key:
+            chosen[key] = record
+            LOG.info(
+                "Superseding %s with %s for one output", best_source.name, source.name
+            )
+        else:
+            LOG.info("Ignoring superseded revision %s", source.name)
+    return list(chosen.values())
 
 
 def _recorded_provenance(
@@ -81,10 +129,16 @@ def _is_current(recorded: dict[str, object] | None, expected: dict[str, object])
     fingerprint = recorded.get("fingerprint")
     if not isinstance(fingerprint, dict):
         # Written before fingerprints existed. Such a record cannot prove the
-        # output is current, but it does name the source it came from, which
-        # is enough to catch the common case of a new IBGE revision arriving
-        # under a new filename. Anything else is reconverted once.
-        return recorded.get("source_name") == expected["source_name"]
+        # output is current: it predates the recording of the dictionary hash,
+        # the column selection, and the output format, any of which may have
+        # changed. Accept it only for a plain, whole-file Parquet conversion of
+        # the same source, which is what earlier versions could produce; every
+        # other case is reconverted once to establish a real fingerprint.
+        if recorded.get("source_name") != expected["source_name"]:
+            return False
+        if expected["columns"] is not None or expected["output_format"] != "parquet":
+            return False
+        return bool(recorded.get("all_string")) == bool(expected["all_string"])
     return all(fingerprint.get(key) == value for key, value in expected.items())
 
 
@@ -127,7 +181,35 @@ def open_fixed_width(
 
 
 def _raw_fields(line: str, layout: Layout) -> list[str]:
-    return [line[var.start - 1 : var.end].strip(" .\r\n") for var in layout.variables]
+    """Slice a fixed-width record into trimmed field values.
+
+    Whitespace is stripped, then a field consisting only of dots is treated as
+    missing. Stripping dots indiscriminately would turn a value like ".5" into
+    "5". PNADC writes its width-15 weights as "000126.89953875", so no real
+    value is affected today, but the distinction costs nothing to keep right.
+    """
+    values: list[str] = []
+    for var in layout.variables:
+        value = line[var.start - 1 : var.end].strip()
+        if value and not value.strip("."):
+            value = ""  # a dot-filled field is a missing-value sentinel
+        values.append(value)
+    return values
+
+
+def normalize_columns(columns: Iterable[str] | None) -> tuple[str, ...] | None:
+    """Freeze a column selection so it can be iterated more than once.
+
+    The selection is used to pick variables, to build the fingerprint, and to
+    record provenance. A generator would be exhausted by the first of those,
+    silently producing a different selection from the one requested.
+    """
+    if columns is None:
+        return None
+    frozen = tuple(columns)
+    if not frozen:
+        raise ValueError("--columns was given no names; omit it to keep every column")
+    return frozen
 
 
 def _select_variables(layout: Layout, columns: Iterable[str] | None) -> list[Variable]:
@@ -244,6 +326,7 @@ def convert_file(
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(target.name + ".part")
     temporary.unlink(missing_ok=True)
+    columns = normalize_columns(columns)
     layout = load_layout(layout_file, layout_member)
     variables = _select_variables(layout, columns)
     name_to_index = {variable.name: index for index, variable in enumerate(layout.variables)}
@@ -300,13 +383,14 @@ def convert_catalog(
 ) -> tuple[int, int, int]:
     if output_format not in ("parquet", "csv"):
         raise ValueError("output_format must be 'parquet' or 'csv'")
+    columns = normalize_columns(columns)
     output_root = settings.parquet_dir if output_format == "parquet" else settings.csv_dir
     catalog_path = settings.metadata_dir / "catalog.json"
     catalog = load_json(catalog_path, None)
     if catalog is None:
         raise FileNotFoundError("Metadata catalog not found; run `pnadc metadata` first")
     converted = skipped = unresolved = 0
-    for record in catalog.get("microdata", []):
+    for record in _preferred_revisions(catalog.get("microdata", []), output_format):
         if scope and record.get("scope") != scope:
             continue
         if years and record.get("year") not in years:
@@ -317,6 +401,17 @@ def convert_catalog(
         if not layout_relative:
             unresolved += 1
             LOG.warning("No layout resolved for %s", record["source"])
+            continue
+        if record.get("member") is None and len(record.get("members") or ()) > 1:
+            # Which member to convert is ambiguous. Report it like any other
+            # unresolved record instead of raising, which would abandon every
+            # remaining file in the batch over one archive.
+            unresolved += 1
+            LOG.warning(
+                "%s holds %d text members; convert it individually with --member",
+                record["source"],
+                len(record["members"]),
+            )
             continue
         source = ensure_within(settings.archive / Path(record["source"]), settings.archive)
         layout_path = ensure_within(settings.archive / Path(layout_relative), settings.archive)

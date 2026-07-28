@@ -71,6 +71,17 @@ jobs:
             exit 1
           fi
 
+      # An editable checkout hides packaging mistakes: a module left out of
+      # the wheel, or an entry point that does not resolve once installed.
+      - name: Install the built wheel in a clean environment and use it
+        run: |
+          python -m venv /tmp/wheelcheck
+          /tmp/wheelcheck/bin/python -m pip install --quiet dist/*.whl
+          cd /tmp   # leave the source tree so the checkout cannot satisfy imports
+          /tmp/wheelcheck/bin/python -c "import pnadc_https; print(pnadc_https.__version__)"
+          /tmp/wheelcheck/bin/python -m pnadc_https --version
+          /tmp/wheelcheck/bin/pnadc --version
+
       - uses: actions/upload-artifact@v7
         with:
           name: distribution

@@ -67,8 +67,9 @@ class Repository:
     ) -> None:
         self.settings: Settings = load_settings(config, archive)
         if include_superseded:
-            # Process Projecoes_Anteriores too; see config.DEFAULT_EXCLUDE.
-            self.settings.exclude = ()
+            # Process Projecoes_Anteriores too, keeping any exclusions the user
+            # configured themselves; see config.DEFAULT_EXCLUDE.
+            self.settings.exclude = self.settings.including_superseded()
 
     def sync(
         self,

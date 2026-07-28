@@ -64,7 +64,7 @@ The `panel` command additionally needs `pandas`; install it with the extra if
 you intend to build person panels:
 
 ```
-python -m pip install "pnadc[panel] @ git+https://github.com/amaciente/pnadc-https.git"
+python -m pip install "pnadc-https[panel] @ git+https://github.com/amaciente/pnadc-https.git"
 ```
 
 To work on the package itself, clone it and install in editable mode:
@@ -217,6 +217,9 @@ size** — 15.9 GiB of 36.4 GiB. They are therefore excluded by default:
 pnadc sync --survey both                        # 256 files, 20.5 GiB
 pnadc sync --survey both --include-superseded    # 444 files, 36.4 GiB
 ```
+
+*Counts and sizes observed on 2026-07-28; the live IBGE tree changes as new
+quarters are published. Run `pnadc sync --dry-run` for current figures.*
 
 The exclusion applies to cataloging and conversion as well as downloading, so
 a copy already on disk from an earlier sync is not silently converted either.

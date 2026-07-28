@@ -9,7 +9,7 @@ description = "Maintain local, standardized repositories of IBGE PNAD Continua m
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "GPL-3.0-or-later"}
-authors = [{name = "PNADC contributors"}]
+authors = [{name = "Aguinaldo Maciente"}]
 keywords = ["IBGE", "PNAD Continua", "microdata", "parquet", "Brazil"]
 classifiers = [
   "Development Status :: 4 - Beta",

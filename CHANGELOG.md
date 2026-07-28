@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-28
+
+### Fixed
+
+- **A revised ZIP kept its old extracted contents.** When an archive's
+  fingerprint changed, extraction was re-run but each existing member was
+  skipped, and the new fingerprint was then recorded — so the repository
+  permanently believed stale extracted files were current. Members are now
+  always rewritten once a rebuild is warranted, and members dropped from the
+  new revision are removed.
+- **A scalar `exclude:` excluded almost everything.** `exclude: Projecoes_Anteriores`
+  was iterated character by character, so any path containing `r` matched.
+  A list is now required, and anything else raises with an example.
+- **Retained revisions were converted repeatedly.** `PNADC_012012_20250815.zip`
+  and `PNADC_012012_20260701.zip` both produce `PNADC_012012.parquet`, and
+  synchronization does not delete a superseded revision. Both were converted,
+  reporting two conversions for one output and leaving whichever ran last.
+  One record per output is now chosen, preferring the newest revision date.
+- `extract` ignored exclusions entirely, so `--include-superseded` had no
+  effect on that command.
+- `--include-superseded` removed every exclusion, including any the user had
+  configured. It now removes only the superseded-projection default.
+- A `columns` selection given as a generator was exhausted by the first of the
+  several passes over it, silently changing the selection. It is frozen once
+  at the public boundary, and an empty selection is rejected.
+- A ZIP holding more than one text member aborted the whole batch. It is now
+  reported as unresolved, like any other record needing manual attention.
+- CSV outputs were fingerprinted with `all_string`, which cannot affect CSV
+  content, so toggling it reconverted identical files.
+- Pre-fingerprint provenance was accepted whenever the source name matched,
+  which could not detect a changed dictionary, column selection, or output
+  format. It is now accepted only for a plain whole-file Parquet conversion.
+- Field values were stripped of dots as well as whitespace, which would turn
+  `.5` into `5`. Only whitespace is stripped; a dot-only field remains a
+  missing-value sentinel. No PNADC value was affected, as the width-15
+  weights are written `000126.89953875`.
+- `panel` fabricated `v1016` when absent, concealing a column-projected or
+  out-of-order input, and recorded absolute paths in its provenance.
+
+### Added
+
+- `pnadc verify` checks mirrored files against the manifest: exact SHA-256 for
+  files this package downloaded, and with `--deep`, a CRC check of every
+  member of adopted archives, which carry no recorded hash.
+- Adoption now reads a ZIP's central directory before trusting it, so a
+  truncated or corrupt file of the right size is downloaded rather than
+  accepted.
+- CI installs the built wheel into a clean environment and exercises the
+  import, `python -m`, and console-script entry points, which an editable
+  checkout cannot catch.
+
+
 ### Added
 
 - Superseded population projections (`Projecoes_Anteriores`) are excluded by
@@ -139,7 +191,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Renamed the distribution from `pnadc-https` to `pnadc`.
+- Renamed the distribution from `pnadc-https` to `pnadc`. (Renamed back to
+  `pnadc-https` in 0.4.0, once `pnadc` was found to be taken on PyPI.)
 - `archive` is the shared repository root; `originals/` and `metadata/` live
   directly under it, alongside `parquet/` and `csv/`.
 
@@ -152,6 +205,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.xls`/`.xlsx` dictionary parsing, metadata catalog, streaming fixed-width
   conversion to Parquet, and person-panel construction.
 
-[Unreleased]: https://github.com/amaciente/pnadc-https/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/amaciente/pnadc-https/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/amaciente/pnadc-https/releases/tag/v0.4.0
 [0.3.0]: https://github.com/amaciente/pnadc-https/releases/tag/v0.3.0
 [0.2.0]: https://github.com/amaciente/pnadc-https/releases/tag/v0.2.0

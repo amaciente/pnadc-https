@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Sequence
 
-from .utils import atomic_json
+from .utils import atomic_json, portable_path
 
 
 HOUSEHOLD_COLUMNS = ("upa", "v1008")
@@ -46,11 +46,22 @@ def build_panel(
         missing = sorted(required - set(frame.columns))
         if missing:
             raise ValueError(f"{path.name} lacks panel identification columns: {', '.join(missing)}")
-        if "v1016" in frame.columns:
-            frame = frame.loc[frame["v1016"] == wave].copy()
-        else:
-            frame = frame.copy()
-            frame["v1016"] = wave
+        if "v1016" not in frame.columns:
+            # v1016 identifies which visit a record belongs to, and the wave
+            # filter is the whole basis of the linkage. Inventing it would
+            # quietly treat an unsuitable input — a column-projected file, or
+            # quarters given out of order — as if it were the right one.
+            raise ValueError(
+                f"{path.name} has no v1016 column, so its visit number is unknown; "
+                "convert without --columns, or include v1016 in the selection"
+            )
+        frame = frame.loc[frame["v1016"] == wave].copy()
+        if frame.empty:
+            raise ValueError(
+                f"{path.name} contains no records for visit {wave}; "
+                "inputs must be consecutive quarters in chronological order, "
+                "beginning with the panel's first visit"
+            )
         frame["panel_wave"] = wave
         frames.append(frame)
 
@@ -81,10 +92,14 @@ def build_panel(
     pq.write_table(pa.Table.from_pandas(table_frame, preserve_index=False), temporary, compression="zstd")
     os.replace(temporary, target)
     result: dict[str, object] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "panel_id": str(panel_id),
-        "inputs": [str(Path(path).resolve()) for path in inputs],
-        "output": str(target),
+        # Recorded relative to the panel's own directory where possible, so the
+        # record stays meaningful if the outputs are moved together, matching
+        # the conversion provenance.
+        "paths_relative_to": "the output directory",
+        "inputs": [portable_path(Path(path).resolve(), target.parent) for path in inputs],
+        "output": target.name,
         "wide": wide,
         "rows": len(table_frame),
         "persons": int(long["person_id"].nunique()),

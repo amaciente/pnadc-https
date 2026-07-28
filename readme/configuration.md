@@ -30,7 +30,7 @@ network:
   retries: 4
   workers: 4
   chunk_size: 1048576
-  user_agent: pnadc/0.2.0
+  user_agent: pnadc/0.4.0
 ```
 
 This lets the whole repository move to another drive or machine unchanged.

@@ -12,9 +12,10 @@ from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
 from typing import Iterable
 from urllib.parse import unquote, urljoin, urlsplit, urlunsplit
+from zipfile import BadZipFile, ZipFile
 
 from .config import Settings
-from .utils import atomic_json, ensure_within, human_size, load_json
+from .utils import atomic_json, ensure_within, human_size, load_json, sha256_stream
 
 LOG = logging.getLogger(__name__)
 
@@ -243,6 +244,25 @@ def discover_remote_files(
     return sorted(remotes, key=lambda item: item.key)
 
 
+def _is_readable(local: Path) -> bool:
+    """Cheap structural check before adopting a file we did not download.
+
+    Reading a ZIP's central directory catches truncation and corruption
+    without reading the payload, which for this archive would mean tens of
+    gigabytes. It does not verify contents against IBGE — only `pnadc verify`
+    does that, by checking every member's CRC.
+    """
+    if local.suffix.lower() != ".zip":
+        return True
+    try:
+        with ZipFile(local) as archive:
+            archive.namelist()
+        return True
+    except (BadZipFile, OSError) as exc:
+        LOG.warning("Not adopting %s; it is not a readable ZIP (%s)", local.name, exc)
+        return False
+
+
 def _is_current(remote: RemoteFile, local: Path, old: dict[str, object] | None) -> bool:
     if not local.is_file() or old is None:
         return False
@@ -255,6 +275,61 @@ def _is_current(remote: RemoteFile, local: Path, old: dict[str, object] | None) 
         if current_value is not None and old.get(field) != current_value:
             return False
     return True
+
+
+@dataclass(slots=True)
+class VerifyResult:
+    checked: int = 0
+    ok: int = 0
+    failed: list[str] = None  # type: ignore[assignment]
+    unverifiable: int = 0
+
+    def __post_init__(self) -> None:
+        if self.failed is None:
+            self.failed = []
+
+
+def verify_archive(settings: Settings, deep: bool = False) -> VerifyResult:
+    """Check mirrored files against what the manifest recorded.
+
+    Files this package downloaded carry a SHA-256 taken from the bytes as they
+    arrived, so they can be checked exactly. Adopted files were never read in
+    full and have no recorded hash; for those, ``deep`` runs a CRC check of
+    every ZIP member, which is the strongest guarantee available without
+    re-downloading, since IBGE publishes no checksums.
+    """
+    manifest = load_json(settings.manifest_path, {"files": {}})
+    result = VerifyResult()
+    for key, entry in sorted(manifest.get("files", {}).items()):
+        local = settings.archive / Path(str(entry.get("local", "")))
+        result.checked += 1
+        if not local.is_file():
+            result.failed.append(f"{key}: missing")
+            continue
+        size = entry.get("size")
+        if size is not None and local.stat().st_size != size:
+            result.failed.append(f"{key}: size {local.stat().st_size} != recorded {size}")
+            continue
+        recorded_hash = entry.get("sha256")
+        if recorded_hash:
+            with local.open("rb") as stream:
+                if sha256_stream(stream) != recorded_hash:
+                    result.failed.append(f"{key}: sha256 mismatch")
+                    continue
+        elif deep and local.suffix.lower() == ".zip":
+            try:
+                with ZipFile(local) as archive:
+                    bad = archive.testzip()
+                if bad is not None:
+                    result.failed.append(f"{key}: CRC failure in member {bad}")
+                    continue
+            except (BadZipFile, OSError) as exc:
+                result.failed.append(f"{key}: unreadable ZIP ({exc})")
+                continue
+        else:
+            result.unverifiable += 1
+        result.ok += 1
+    return result
 
 
 def sync_archive(
@@ -289,7 +364,7 @@ def sync_archive(
         # would be downloaded from scratch, which for PNADC means tens of
         # gigabytes to arrive at bytes already present.
         if recorded is None and remote.size is not None and local.is_file():
-            if local.stat().st_size == remote.size:
+            if local.stat().st_size == remote.size and _is_readable(local):
                 entry = asdict(remote)
                 entry.update(
                     {

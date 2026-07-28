@@ -22,5 +22,5 @@ network:
   retries: 4
   workers: 4
   chunk_size: 1048576
-  user_agent: pnadc/0.3.0
+  user_agent: pnadc/0.4.0
 
