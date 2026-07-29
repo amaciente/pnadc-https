@@ -28,7 +28,9 @@ jobs:
           - {os: windows-latest, python-version: "3.11"}
           - {os: windows-latest, python-version: "3.12"}
           - {os: windows-latest, python-version: "3.13"}
-          - {os: windows-latest, python-version: "3.14"}
+          # 3.14 is exercised on Linux only: the Windows runner image does not
+          # reliably carry it yet, and a job that fails on interpreter setup
+          # says nothing about this package.
           - {os: ubuntu-latest, python-version: "3.10"}
           - {os: ubuntu-latest, python-version: "3.11"}
           - {os: ubuntu-latest, python-version: "3.12"}
