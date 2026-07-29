@@ -10,7 +10,7 @@ import re
 from contextlib import contextmanager
 from pathlib import Path
 from typing import IO, Iterable, Iterator
-from zipfile import ZipFile
+from zipfile import BadZipFile, ZipFile
 
 from ._version import __version__
 from .config import Settings
@@ -27,7 +27,20 @@ PROVENANCE_SCHEMA_VERSION = 3
 # version: tying freshness to every release would rebuild an entire archive
 # after a documentation-only patch, which for PNADC means hours of work and
 # tens of gigabytes rewritten for no change in the data.
+#
+# Bump this only after confirming that output actually differs. The change to
+# _raw_fields() in 0.4.0 — stripping whitespace and treating a dot-filled
+# field as missing, rather than stripping dots from the ends of every value —
+# looked like it qualified, but comparing both implementations over quarterly,
+# annual-visit and annual-topic microdata found zero differing values in
+# ~8,000 records. PNADC writes its only decimal fields, the width-15 weights,
+# as "000126.89953875", never with a leading or trailing dot. Rebuilding the
+# archive would have rewritten tens of gigabytes byte-for-byte identically.
 CONVERSION_FORMAT_VERSION = 1
+
+
+class ConversionDataError(ValueError):
+    """A problem confined to one source record during batch conversion."""
 
 
 def conversion_fingerprint(
@@ -132,6 +145,7 @@ def write_pynad_index(directory: Path, sources: dict[str, list[str]] | None = No
 
     One JSON object per line, as `pynad` writes and reads it.
     """
+    directory.mkdir(parents=True, exist_ok=True)
     lines = []
     for parquet in sorted(directory.glob("*.parquet")):
         record = {
@@ -171,17 +185,10 @@ def _is_current(recorded: dict[str, object] | None, expected: dict[str, object])
         return False
     fingerprint = recorded.get("fingerprint")
     if not isinstance(fingerprint, dict):
-        # Written before fingerprints existed. Such a record cannot prove the
-        # output is current: it predates the recording of the dictionary hash,
-        # the column selection, and the output format, any of which may have
-        # changed. Accept it only for a plain, whole-file Parquet conversion of
-        # the same source, which is what earlier versions could produce; every
-        # other case is reconverted once to establish a real fingerprint.
-        if recorded.get("source_name") != expected["source_name"]:
-            return False
-        if expected["columns"] is not None or expected["output_format"] != "parquet":
-            return False
-        return bool(recorded.get("all_string")) == bool(expected["all_string"])
+        # A legacy record predates the dictionary hash and conversion options,
+        # so it cannot prove that the output is current. Reconvert once to
+        # establish a complete fingerprint.
+        return False
     return all(fingerprint.get(key) == value for key, value in expected.items())
 
 
@@ -331,7 +338,9 @@ def _parse_value(value: str, variable: Variable, all_string: bool) -> str | int 
             return float(value.replace(",", "."))
         return int(value)
     except ValueError as exc:
-        raise ValueError(f"Invalid {variable.storage_type} value for {variable.name}: {value!r}") from exc
+        raise ConversionDataError(
+            f"Invalid {variable.storage_type} value for {variable.name}: {value!r}"
+        ) from exc
 
 
 def _arrow_type(variable: Variable, all_string: bool):
@@ -445,6 +454,9 @@ def convert_file(
                 "than a data file, it should not be in the catalog"
             ),
         ) from None
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
     os.replace(temporary, target)
     output_format = "csv" if target.suffix.lower() == ".csv" else "parquet"
     # Paths are stored relative to the repository root where possible, so the
@@ -536,12 +548,12 @@ def convert_catalog(
         expected = conversion_fingerprint(
             source, layout_path, columns, all_string, output_format
         )
-        produced[target.name] = [record["source"], str(layout_relative)]
         legacy_provenance = target_dir / f"{source.stem}.{output_format}.provenance.json"
         if target.exists() and not force:
             recorded = _recorded_provenance(provenance_path, legacy_provenance)
             if _is_current(recorded, expected):
                 skipped += 1
+                produced[target.name] = [record["source"], str(layout_relative)]
                 continue
             LOG.info("Reconverting %s; its inputs or options changed", target.name)
         try:
@@ -556,7 +568,7 @@ def convert_catalog(
                 columns=columns,
                 root=settings.archive,
             )
-        except (UnicodeDecodeError, ValueError, OSError) as exc:
+        except (BadZipFile, ConversionDataError, UnicodeDecodeError) as exc:
             # One unconvertible file must not discard the work queued behind
             # it. Report it the way an unresolved layout is reported and move
             # on; a batch over a whole archive is too long to restart because
@@ -565,6 +577,7 @@ def convert_catalog(
             LOG.error("Could not convert %s: %s", record["source"], exc)
             continue
         converted += 1
+        produced[target.name] = [record["source"], str(layout_relative)]
         LOG.info("Converted %s", source)
     if unresolved:
         LOG.warning(

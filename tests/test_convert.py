@@ -4,7 +4,11 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-from pnadc_https.convert import convert_file, simplified_output_stem
+from pnadc_https.convert import (
+    _is_current,
+    convert_file,
+    simplified_output_stem,
+)
 from support import workspace
 
 
@@ -21,6 +25,25 @@ def _layout(path: Path) -> None:
 
 
 class ConvertTests(unittest.TestCase):
+    def test_legacy_provenance_is_reconverted_once(self):
+        expected = {
+            "source_name": "PNADC_012012.zip",
+            "columns": None,
+            "all_string": False,
+            "output_format": "parquet",
+        }
+        legacy = {
+            "source_name": "PNADC_012012.zip",
+            "all_string": False,
+        }
+        # A record without a fingerprint cannot prove anything about the
+        # dictionary or the options used, so it is reconverted once to
+        # establish one. This is what migrates a pre-0.4 archive; the
+        # conversion format version is deliberately not involved, since
+        # bumping that would rebuild every output whether or not its content
+        # would change.
+        self.assertFalse(_is_current(legacy, expected))
+
     def test_simplifies_trailing_revision_date(self):
         self.assertEqual(
             simplified_output_stem("PNADC_012012_20250815"),

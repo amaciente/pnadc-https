@@ -135,6 +135,15 @@ class UpdatePathTests(unittest.TestCase):
             # Selecting the same columns again is a no-op.
             self.assertEqual(convert_catalog(settings, columns=["uf"]), (0, 1, 0))
 
+    def test_unknown_batch_column_is_a_configuration_error(self):
+        with workspace() as tmp_path:
+            settings = self._repository(tmp_path)
+            self._write_data("PNADC_012012.zip", "110001\n120042\n")
+            generate_metadata(settings)
+
+            with self.assertRaisesRegex(ValueError, "Unknown column"):
+                convert_catalog(settings, columns=["not_a_variable"])
+
     def test_changed_all_string_invalidates_output(self):
         with workspace() as tmp_path:
             settings = self._repository(tmp_path)

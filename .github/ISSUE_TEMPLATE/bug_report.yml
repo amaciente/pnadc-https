@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a reproducible problem in pnadc-https
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Never attach PNAD microdata or paste
+        records from it. File names, catalog metadata, and error messages are
+        normally sufficient.
+  - type: input
+    id: version
+    attributes:
+      label: pnadc-https version
+      description: Run `pnadc --version`.
+      placeholder: "0.4.0"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version and operating system
+      placeholder: "Python 3.12.4 on Windows 11"
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command or Python call
+      description: Remove credentials and use paths that do not identify people.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and complete error
+      description: Add verbose output (`-v` or `-vv`) when practical.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste `pnadc doctor --config <your config> --network`, with sensitive paths removed.
+      render: text
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data-safety confirmation
+      options:
+        - label: I have not included PNAD microdata, credentials, or access tokens.
+          required: true

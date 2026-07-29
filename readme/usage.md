@@ -44,6 +44,11 @@ pnadc convert-many --config C:\data\pnadc\pnadc.yml `
 Unknown columns fail immediately. Existing outputs are skipped unless
 `--force` is explicitly supplied to the conversion command.
 
+Set `output_layout: flat` in `pnadc.yml` to write one directory of
+`pynad`-style names instead of the default survey/year tree. If the files will
+feed `pynad`'s panel stage, also set `parquet: microdados/parquet`; see the
+[configuration guide](configuration.md).
+
 ## Python API
 
 ```python
@@ -76,6 +81,14 @@ result = repo.update(
 )
 ```
 
+Verify mirrored originals through the Python API:
+
+```python
+verification = repo.verify(deep=True)
+if verification.failed:
+    raise RuntimeError(verification.failed)
+```
+
 For large files, read only needed columns:
 
 ```python
@@ -98,6 +111,8 @@ pnadc panel 2012Q1.parquet 2012Q2.parquet 2012Q3.parquet `
 ```
 
 The deterministic linkage uses dwelling, sex, reported birth date, and a
-within-wave duplicate rank. See the compatibility guide before treating it as
-an exact reproduction of `pynad`'s historical classifier.
+within-wave duplicate rank. Inputs must include `ano`, `trimestre`, `v1016`,
+and the linkage variables; their chronology is validated against `--panel-id`.
+See the compatibility guide before treating it as an exact reproduction of
+`pynad`'s historical classifier.
 

@@ -144,6 +144,44 @@ class ExtractionRefreshTests(unittest.TestCase):
             settings.exclude = ()
             self.assertEqual(extract_archive(settings), (1, 0))
 
+    def test_pruned_source_removes_recorded_extracted_derivatives(self):
+        with workspace() as tmp_path:
+            settings = Settings(archive=tmp_path / "archive")
+            source = self._archive(settings, {"PNADC_012012.txt": "contents"})
+            extract_archive(settings)
+            output = (
+                settings.archive
+                / "extracted"
+                / "trimestral"
+                / "2012"
+                / "PNADC_012012"
+                / "PNADC_012012.txt"
+            )
+            self.assertTrue(output.is_file())
+
+            source.unlink()
+            self.assertEqual(extract_archive(settings), (0, 0))
+            self.assertFalse(output.exists())
+            state = json.loads(
+                (settings.state_dir / "extracted.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(state["files"], {})
+
+    def test_uppercase_zip_extension_is_extracted(self):
+        with workspace() as tmp_path:
+            settings = Settings(archive=tmp_path / "archive")
+            source = (
+                settings.originals
+                / "trimestral"
+                / "2012"
+                / "PNADC_012012.ZIP"
+            )
+            source.parent.mkdir(parents=True)
+            with ZipFile(source, "w") as handle:
+                handle.writestr("PNADC_012012.txt", "contents")
+
+            self.assertEqual(extract_archive(settings), (1, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

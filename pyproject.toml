@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,16 +8,18 @@ dynamic = ["version"]
 description = "Maintain local, standardized repositories of IBGE PNAD Continua microdata"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "GPL-3.0-or-later"}
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 authors = [{name = "Aguinaldo Maciente"}]
 keywords = ["IBGE", "PNAD Continua", "microdata", "parquet", "Brazil"]
 classifiers = [
   "Development Status :: 4 - Beta",
-  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [

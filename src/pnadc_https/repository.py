@@ -7,7 +7,7 @@ from typing import Iterable
 
 from .config import DEFAULT_USER_AGENT, Settings, load_settings
 from .convert import convert_catalog
-from .downloader import SyncResult, sync_archive
+from .downloader import SyncResult, VerifyResult, sync_archive, verify_archive
 from .metadata import generate_metadata
 
 REPOSITORY_DIRECTORIES = (
@@ -38,6 +38,9 @@ def init_repository(path: str | Path) -> Path:
         "archive: .\n"
         "parquet: parquet\n"
         "csv: csv\n"
+        "output_layout: nested\n"
+        "exclude:\n"
+        "  - Projecoes_Anteriores\n"
         "network:\n"
         "  connect_timeout: 20\n"
         "  read_timeout: 120\n"
@@ -93,6 +96,10 @@ class Repository:
     def catalog(self, *, force: bool = False) -> dict[str, object]:
         """Parse dictionaries and rebuild the local metadata catalog."""
         return generate_metadata(self.settings, force=force)
+
+    def verify(self, *, deep: bool = False) -> VerifyResult:
+        """Verify mirrored originals against the synchronization manifest."""
+        return verify_archive(self.settings, deep=deep)
 
     def standardize(
         self,

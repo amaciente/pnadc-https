@@ -136,6 +136,19 @@ class FlatLayoutTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 load_settings(config)
 
+    def test_empty_flat_catalog_writes_an_empty_index(self):
+        with workspace() as tmp_path:
+            settings = Settings(archive=tmp_path / "archive", output_layout="flat")
+            settings.metadata_dir.mkdir(parents=True)
+            (settings.metadata_dir / "catalog.json").write_text(
+                '{"microdata": []}\n', encoding="utf-8"
+            )
+
+            self.assertEqual(convert_catalog(settings), (0, 0, 0))
+            index = settings.parquet_dir / "pnadc.microdados.dicionarios.json"
+            self.assertTrue(index.is_file())
+            self.assertEqual(index.read_text(encoding="utf-8"), "")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -15,11 +15,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it failed with `'utf-8' codec can't decode byte 0xcd`, because that program
   is Latin-1 prose rather than fixed-width records. Archives named as
   dictionaries, inputs, documentation, or deflators are no longer cataloged.
+  Documentation-directory components are checked as well as filenames, so a
+  generic name such as `Documentacao/Programas.zip` is also ignored.
 - **One unconvertible file aborted the whole batch.** A `convert-many` over
-  the full archive now reports the failure and continues, rather than
-  discarding the work still queued behind it.
+  the full archive now reports record-level data failures and continues,
+  rather than discarding the work still queued behind it. Invalid user options,
+  disk-full, permission, and other infrastructure failures still abort with a
+  nonzero status instead of being mislabeled as unresolved data.
 - A decode failure now names the file and member, and suggests
   `--encoding latin-1`, instead of surfacing a bare codec error.
+- Panel inputs now require one `ano`/`trimestre` period each and are checked
+  against `panel_id` for chronological order and consecutive quarters.
+- Legacy provenance without a complete fingerprint is rebuilt once; it can no
+  longer preserve stale output after a dictionary revision.
+- Flat conversion with no matching catalog records now creates an empty
+  `pnadc.microdados.dicionarios.json` instead of failing because the output
+  directory does not exist.
+- Successful concurrent downloads are saved in the manifest even when another
+  download fails, preserving their SHA-256 instead of adopting them without a
+  hash on the next run.
+- Verification now reports verified and unverifiable files as disjoint
+  categories and rejects manifest paths outside the repository.
+- Uppercase `.ZIP` archives are cataloged and extracted on case-sensitive
+  systems. Extraction also removes recorded derivatives after their original
+  archive is pruned.
 
 ### Added
 
@@ -34,6 +53,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   converted files. A repository built here can therefore be handed to `pynad`
   for panel assembly as though `pynad` had produced it, without
   re-downloading or re-converting anything.
+- `Repository.verify()` exposes manifest verification through the Python API.
+- Generated configurations include `output_layout` and the default exclusion.
+- Conversion format version 2 records the corrected field-trimming semantics.
+- CI covers Python 3.10 through 3.14, Windows, Linux, and macOS, uses
+  read-only default permissions, and pins third-party actions to commits.
+- Package metadata uses the current SPDX license format and declares the
+  tested Python 3.13 and 3.14 versions.
+- GitHub issue forms, a pull-request checklist, and a private-reporting
+  security policy guide contributions without exposing PNAD microdata.
 
 ## [0.4.0] - 2026-07-28
 
@@ -66,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   content, so toggling it reconverted identical files.
 - Pre-fingerprint provenance was accepted whenever the source name matched,
   which could not detect a changed dictionary, column selection, or output
-  format. It is now accepted only for a plain whole-file Parquet conversion.
+  format. It is now rebuilt once to establish a complete fingerprint.
 - Field values were stripped of dots as well as whitespace, which would turn
   `.5` into `5`. Only whitespace is stripped; a dot-only field remains a
   missing-value sentinel. No PNADC value was affected, as the width-15

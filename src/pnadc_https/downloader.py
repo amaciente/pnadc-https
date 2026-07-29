@@ -7,7 +7,7 @@ import logging
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
 from typing import Iterable
@@ -281,12 +281,8 @@ def _is_current(remote: RemoteFile, local: Path, old: dict[str, object] | None) 
 class VerifyResult:
     checked: int = 0
     ok: int = 0
-    failed: list[str] = None  # type: ignore[assignment]
+    failed: list[str] = field(default_factory=list)
     unverifiable: int = 0
-
-    def __post_init__(self) -> None:
-        if self.failed is None:
-            self.failed = []
 
 
 def verify_archive(settings: Settings, deep: bool = False) -> VerifyResult:
@@ -301,8 +297,15 @@ def verify_archive(settings: Settings, deep: bool = False) -> VerifyResult:
     manifest = load_json(settings.manifest_path, {"files": {}})
     result = VerifyResult()
     for key, entry in sorted(manifest.get("files", {}).items()):
-        local = settings.archive / Path(str(entry.get("local", "")))
         result.checked += 1
+        try:
+            local = ensure_within(
+                settings.archive / Path(str(entry.get("local", ""))),
+                settings.archive,
+            )
+        except ValueError:
+            result.failed.append(f"{key}: manifest path escapes the repository")
+            continue
         if not local.is_file():
             result.failed.append(f"{key}: missing")
             continue
@@ -316,6 +319,7 @@ def verify_archive(settings: Settings, deep: bool = False) -> VerifyResult:
                 if sha256_stream(stream) != recorded_hash:
                     result.failed.append(f"{key}: sha256 mismatch")
                     continue
+            result.ok += 1
         elif deep and local.suffix.lower() == ".zip":
             try:
                 with ZipFile(local) as archive:
@@ -326,9 +330,9 @@ def verify_archive(settings: Settings, deep: bool = False) -> VerifyResult:
             except (BadZipFile, OSError) as exc:
                 result.failed.append(f"{key}: unreadable ZIP ({exc})")
                 continue
+            result.ok += 1
         else:
             result.unverifiable += 1
-        result.ok += 1
     return result
 
 
@@ -341,12 +345,13 @@ def sync_archive(
     quarters: set[int] | None = None,
 ) -> SyncResult:
     """Synchronize selected remote trees into ``archive/originals``."""
+    surveys = tuple(surveys)
     if prune and (years or quarters):
         raise ValueError("--prune cannot be combined with period filters because the remote view is partial")
     settings.state_dir.mkdir(parents=True, exist_ok=True)
     old_manifest = load_json(settings.manifest_path, {"version": 1, "files": {}})
     old_files: dict[str, dict[str, object]] = old_manifest.get("files", {})
-    remotes = discover_remote_files(settings, tuple(surveys), years, quarters)
+    remotes = discover_remote_files(settings, surveys, years, quarters)
     result = SyncResult(discovered=len(remotes))
     current_keys = {remote.key for remote in remotes}
     new_files = dict(old_files)
@@ -398,6 +403,7 @@ def sync_archive(
         return result
 
     client = HttpClient(settings)
+    failures: list[tuple[RemoteFile, Exception]] = []
     with ThreadPoolExecutor(max_workers=settings.network.workers) as pool:
         futures = {
             pool.submit(client.download, remote, local, settings.network.chunk_size): (remote, local)
@@ -405,7 +411,12 @@ def sync_archive(
         }
         for future in as_completed(futures):
             remote, local = futures[future]
-            count, digest = future.result()
+            try:
+                count, digest = future.result()
+            except Exception as exc:
+                failures.append((remote, exc))
+                LOG.error("Could not download %s: %s", remote.key, exc)
+                continue
             result.downloaded += 1
             result.bytes_downloaded += count
             entry = asdict(remote)
@@ -416,4 +427,11 @@ def sync_archive(
             LOG.info("Downloaded %s", remote.key)
 
     atomic_json(settings.manifest_path, {"version": 1, "files": new_files})
+    if failures:
+        names = ", ".join(remote.key for remote, _ in failures[:3])
+        if len(failures) > 3:
+            names += f", and {len(failures) - 3} more"
+        raise RuntimeError(
+            f"{len(failures)} download(s) failed after successful files were recorded: {names}"
+        ) from failures[0][1]
     return result

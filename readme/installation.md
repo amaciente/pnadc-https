@@ -57,7 +57,7 @@ python -m build
 ```
 
 Copy the `.whl` file from `dist\` to the other machine, then install it by
-name (the filename carries the version, for example `pnadc_https-0.3.0-py3-none-any.whl`):
+name (the filename carries the version, for example `pnadc_https-0.4.0-py3-none-any.whl`):
 
 ```powershell
 python -m pip install .\dist\pnadc_https-*.whl

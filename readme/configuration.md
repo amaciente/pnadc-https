@@ -24,6 +24,9 @@ Paths are resolved relative to the YAML file:
 archive: .
 parquet: parquet
 csv: csv
+output_layout: nested
+exclude:
+  - Projecoes_Anteriores
 network:
   connect_timeout: 20
   read_timeout: 120
@@ -35,6 +38,26 @@ network:
 
 This lets the whole repository move to another drive or machine unchanged.
 Absolute paths are also accepted when outputs need separate disks.
+
+`output_layout` controls converted-file placement:
+
+- `nested` (default) writes `<survey>/<year>/PNADC_....parquet`;
+- `flat` writes all files together using `pynad`-style names.
+
+For direct use by the panel stage of `pynad` 3.0.3, configure:
+
+```yaml
+archive: .
+parquet: microdados/parquet
+output_layout: flat
+```
+
+The generated index supports `pynad` panel discovery. Do not run `pynad`'s
+own synchronization/conversion maintenance over these files.
+
+`exclude` must be a YAML list. An empty list mirrors everything. The
+`--include-superseded` option removes only the default
+`Projecoes_Anteriores` exclusion and preserves custom entries.
 
 ## Directory layout
 

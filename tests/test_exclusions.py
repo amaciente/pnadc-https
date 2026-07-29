@@ -57,6 +57,19 @@ class ExclusionTests(unittest.TestCase):
             self.assertTrue(settings.is_excluded("anual/Trimestre/Trimestre_3/x.zip"))
             self.assertFalse(settings.is_excluded("anual/Projecoes_Anteriores/x.zip"))
 
+            config.write_text(
+                "archive: .\nexclude: Projecoes_Anteriores\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ValueError, "YAML list"):
+                load_settings(config)
+
+    def test_include_superseded_preserves_custom_exclusions_case_insensitively(self):
+        settings = Settings(
+            archive="unused",
+            exclude=("projecoes_anteriores", "Trimestre_3"),
+        )
+        self.assertEqual(settings.including_superseded(), ("Trimestre_3",))
+
     def test_excluded_files_already_on_disk_are_not_cataloged(self):
         # A repository synced before the exclusion existed still holds the
         # files; they must not be silently cataloged and converted.
@@ -85,6 +98,36 @@ class ExclusionTests(unittest.TestCase):
             sources = [record["source"] for record in catalog["microdata"]]
             self.assertEqual(len(sources), 2)
             self.assertIn("Projecoes_Anteriores", " ".join(sources))
+
+    def test_generic_archives_below_documentation_are_not_microdata(self):
+        with workspace() as tmp_path:
+            settings = Settings(archive=tmp_path / "archive")
+            docs = settings.originals / "trimestral" / "Documentacao"
+            docs.mkdir(parents=True)
+            with ZipFile(docs / "Programas.zip", "w") as handle:
+                handle.writestr("leitura.sas.txt", "SAS documentation")
+
+            catalog = generate_metadata(settings)
+            self.assertEqual(catalog["microdata"], [])
+
+    def test_uppercase_zip_extension_is_cataloged(self):
+        with workspace() as tmp_path:
+            settings = Settings(archive=tmp_path / "archive")
+            docs = settings.originals / "trimestral" / "Documentacao"
+            data = settings.originals / "trimestral" / "2025"
+            docs.mkdir(parents=True)
+            data.mkdir(parents=True)
+            with ZipFile(docs / "Dicionario_e_input.zip", "w") as handle:
+                handle.writestr(
+                    "dicionario_PNADC_microdados_trimestral.xlsx",
+                    _dictionary_bytes(),
+                )
+            with ZipFile(data / "PNADC_012025.ZIP", "w") as handle:
+                handle.writestr("PNADC_012025.txt", "110001\n")
+
+            catalog = generate_metadata(settings)
+            self.assertEqual(len(catalog["microdata"]), 1)
+            self.assertTrue(catalog["microdata"][0]["source"].endswith(".ZIP"))
 
 
 class CoveredYearTests(unittest.TestCase):

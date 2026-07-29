@@ -19,6 +19,12 @@ are:
 Keep `pynad` when exact reproduction of its seven-category historical panel
 classifier is a requirement.
 
+For panel-stage interoperability with `pynad` 3.0.3, set
+`output_layout: flat` and `parquet: microdados/parquet`. The generated file
+names and line-delimited index match what its panel reader consumes. This does
+not make the two synchronization/conversion metadata systems interchangeable;
+do not run `pynad` maintenance over the same derived files.
+
 ## Official `PNADcIBGE` R package
 
 The package adopts two useful interface principles:
@@ -48,4 +54,3 @@ There are two important boundaries:
 
 Always inspect the provenance sidecar and catalog when a variable definition
 changes across years.
-

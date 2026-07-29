@@ -134,8 +134,14 @@ def _dictionary_sources(settings: Settings) -> list[DictionarySource]:
 
 def _microdata_sources(settings: Settings) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
-    for path in sorted(settings.originals.rglob("*.zip")):
-        if settings.is_excluded(path.relative_to(settings.originals).as_posix()):
+    sources = (
+        path
+        for path in sorted(settings.originals.rglob("*"))
+        if path.is_file() and path.suffix.lower() == ".zip"
+    )
+    for path in sources:
+        local_relative = path.relative_to(settings.originals)
+        if settings.is_excluded(local_relative.as_posix()):
             continue
         # A documentation archive is not microdata even though it ships a
         # .txt member: Dicionario_e_input_*.zip carries the SAS reading
@@ -143,6 +149,9 @@ def _microdata_sources(settings: Settings) -> list[dict[str, object]]:
         if any(
             token in path.name.lower()
             for token in ("dicion", "input", "document", "deflator")
+        ) or any(
+            token in local_relative.as_posix().lower().split("/")
+            for token in ("documentacao", "documentação", "documentation")
         ):
             continue
         try:

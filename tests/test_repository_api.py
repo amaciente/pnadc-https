@@ -16,6 +16,9 @@ class RepositoryApiTests(unittest.TestCase):
             self.assertEqual(config, (root / "pnadc.yml").resolve())
             self.assertTrue((root / "originals" / "trimestral").is_dir())
             self.assertTrue((root / "metadata" / "layouts").is_dir())
+            generated = config.read_text(encoding="utf-8")
+            self.assertIn("output_layout: nested", generated)
+            self.assertIn("Projecoes_Anteriores", generated)
             repository = Repository(config)
             self.assertEqual(repository.settings.archive, root.resolve())
             self.assertEqual(repository.settings.parquet_dir, (root / "parquet").resolve())
@@ -39,6 +42,12 @@ class RepositoryApiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             config = init_repository(Path(temporary))
             self.assertIn(f"user_agent: pnadc/{__version__}", config.read_text(encoding="utf-8"))
+
+    def test_repository_exposes_verification(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config = init_repository(Path(temporary))
+            result = Repository(config).verify()
+            self.assertEqual((result.checked, result.ok, result.unverifiable), (0, 0, 0))
 
 
 if __name__ == "__main__":

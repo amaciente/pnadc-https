@@ -9,6 +9,9 @@ on:
     types: [published]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test (${{ matrix.os }}, Python ${{ matrix.python-version }})
@@ -16,14 +19,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
-        python-version: ["3.10", "3.11", "3.12"]
+        include:
+          # Windows carries the full range: it is this package's primary
+          # platform, and every failure found so far — the 8.3 short path,
+          # the blocked console-script launcher — has been Windows-specific.
+          # Testing it on one version only would not have caught them.
+          - {os: windows-latest, python-version: "3.10"}
+          - {os: windows-latest, python-version: "3.11"}
+          - {os: windows-latest, python-version: "3.12"}
+          - {os: windows-latest, python-version: "3.13"}
+          - {os: windows-latest, python-version: "3.14"}
+          - {os: ubuntu-latest, python-version: "3.10"}
+          - {os: ubuntu-latest, python-version: "3.11"}
+          - {os: ubuntu-latest, python-version: "3.12"}
+          - {os: ubuntu-latest, python-version: "3.13"}
+          - {os: ubuntu-latest, python-version: "3.14"}
+          # macOS is claimed as supported, so it is exercised on one version
+          # rather than left to assumption.
+          - {os: macos-latest, python-version: "3.12"}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -43,9 +62,9 @@ jobs:
     name: Build distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
 
@@ -82,7 +101,7 @@ jobs:
           /tmp/wheelcheck/bin/python -m pnadc_https --version
           /tmp/wheelcheck/bin/pnadc --version
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: distribution
           path: dist/
@@ -104,10 +123,10 @@ jobs:
       id-token: write
     steps:
       - name: Download the distribution built above
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: distribution
           path: dist/
 
       - name: Publish
-        uses: pypa/gh-action-pypi-publish@v1.14.1
+        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1

@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a focused improvement to pnadc-https
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the repository-management or standardization need.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Include a short command or API example when useful.
+    validations:
+      required: true
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Main interface affected
+      options:
+        - Command-line interface
+        - Python API
+        - Configuration
+        - Parquet/CSV output
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or related tools
+      description: Note relevant behavior in pynad, PNADcIBGE, Python, or R.

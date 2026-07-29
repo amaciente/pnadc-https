@@ -21,6 +21,24 @@ pnadc update --config C:\data\pnadc\pnadc.yml `
 Downloads are incremental. The manifest records HTTP size, ETag, and
 Last-Modified metadata. Complete unchanged files are skipped.
 
+## Repository verification
+
+Check downloaded originals against their recorded SHA-256:
+
+```powershell
+pnadc verify --config C:\data\pnadc\pnadc.yml
+```
+
+Files adopted from an existing repository have no recorded remote hash. Read
+every ZIP member and check its CRC with:
+
+```powershell
+pnadc verify --config C:\data\pnadc\pnadc.yml --deep
+```
+
+Verification reads the entire archive and can take substantial time.
+Downloaded, adopted, and unverifiable files are reported separately.
+
 ## Interrupted downloads
 
 An incomplete transfer remains as a `.part` file and is never accepted as an
@@ -39,6 +57,9 @@ command with `--force`. Keep the adjacent provenance JSON with the output.
 listed by IBGE. It cannot be combined with year or quarter filters because a
 partial remote view cannot prove that other files disappeared.
 
+The next `pnadc extract` reconciles its reproducible derivatives after pruning:
+extracted members whose recorded source archive no longer exists are removed.
+
 Back up originals and the `.pnadc` manifest before broad maintenance. Ordinary
 sync, metadata, and conversion commands do not delete original microdata.
 
@@ -51,4 +72,3 @@ For a published analysis, retain:
 - each Parquet provenance sidecar
 - `metadata/catalog.json` and the referenced layout JSON
 - the exact analysis variable list and deflator/design method
-

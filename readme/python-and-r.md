@@ -28,6 +28,10 @@ result = duckdb.sql("""
 """).df()
 ```
 
+With `output_layout: flat`, point pandas, Arrow, or DuckDB at
+`C:/data/pnadc/parquet/*.parquet` instead. The data schema is identical; only
+file placement and names differ.
+
 ## R and RStudio
 
 Install Arrow once:
@@ -70,4 +74,3 @@ working with its returned objects) for design-aware estimates.
 Do not compare nominal income across periods without applying the matching
 official deflator. This package preserves source variables and documentation;
 it does not silently alter income values.
-

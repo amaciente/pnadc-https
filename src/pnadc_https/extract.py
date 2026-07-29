@@ -53,9 +53,16 @@ def extract_archive(settings: Settings, force: bool = False) -> tuple[int, int]:
     state: dict[str, dict[str, object]] = load_json(state_path, {"files": {}})
     records = state.setdefault("files", {})
     processed = skipped = 0
-    for source in sorted(settings.originals.rglob("*.zip")):
+    present_keys: set[str] = set()
+    sources = (
+        path
+        for path in sorted(settings.originals.rglob("*"))
+        if path.is_file() and path.suffix.lower() == ".zip"
+    )
+    for source in sources:
         relative = source.relative_to(settings.originals)
         key = relative.as_posix()
+        present_keys.add(key)
         if settings.is_excluded(key):
             continue
         fingerprint = _source_fingerprint(source)
@@ -83,6 +90,20 @@ def extract_archive(settings: Settings, force: bool = False) -> tuple[int, int]:
         records[key] = {"source": fingerprint, "outputs": current}
         processed += 1
         LOG.info("Extracted %s", relative)
+    # When sync --prune removes an original archive, remove only the extracted
+    # derivatives recorded for that source. These paths are reproducible and
+    # are constrained to the extracted tree before deletion.
+    for stale_key in set(records) - present_keys:
+        previous = records.get(stale_key, {})
+        for stale in previous.get("outputs") or ():
+            obsolete = settings.archive / Path(stale)
+            try:
+                ensure_within(obsolete, settings.archive / "extracted").unlink(
+                    missing_ok=True
+                )
+            except ValueError:
+                LOG.warning("Refusing to remove path outside the archive: %s", stale)
+        records.pop(stale_key, None)
+        LOG.info("Removed extraction state for missing source %s", stale_key)
     atomic_json(state_path, state)
     return processed, skipped
-

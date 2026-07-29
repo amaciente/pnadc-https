@@ -66,7 +66,8 @@ class Settings:
         configured for their own reasons, so only the entries this package
         adds by default are taken out.
         """
-        return tuple(token for token in self.exclude if token not in DEFAULT_EXCLUDE)
+        defaults = {token.casefold() for token in DEFAULT_EXCLUDE}
+        return tuple(token for token in self.exclude if token.casefold() not in defaults)
 
     @property
     def originals(self) -> Path:

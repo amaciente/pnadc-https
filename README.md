@@ -206,6 +206,19 @@ summary. This matters when a manifest is missing — deleted, or never written
 because the archive predates it — since the alternative is re-fetching tens
 of gigabytes to arrive at bytes that are already there.
 
+Use `pnadc verify` to check downloaded files against the SHA-256 recorded in
+the manifest. Adopted files have no remote checksum; `pnadc verify --deep`
+reads every member and verifies each ZIP CRC instead:
+
+```powershell
+pnadc verify --config C:\data\pnadc\pnadc.yml
+pnadc verify --config C:\data\pnadc\pnadc.yml --deep
+```
+
+Verification reads the complete archive and can take substantial time.
+An adopted non-ZIP file remains explicitly `unverifiable`, because IBGE does
+not publish an authoritative checksum for comparison.
+
 #### Superseded projections are skipped by default
 
 `Projecoes_Anteriores` holds population projections that later revisions
@@ -333,13 +346,49 @@ content has changed:
 - the source was replaced under its existing filename;
 - the dictionary was reissued, changing column positions;
 - `--columns` or `--all-string` differs from the previous run;
-- the package version changed.
+- the package's conversion-format version changed because output semantics
+  changed.
 
 Outputs that are genuinely up to date are still skipped, so routine
 re-synchronization remains inexpensive. Sources are compared by size and
 modification time rather than by hash, because hashing every multi-hundred
 megabyte archive would turn an up-to-date run into a full read of the
 repository; dictionaries, being small, are compared by SHA-256.
+
+#### Nested and flat output layouts
+
+The default `nested` layout mirrors IBGE's organization:
+
+```text
+parquet/trimestral/2025/PNADC_012025.parquet
+```
+
+Set `output_layout: flat` to keep every converted file in one directory with
+the naming convention used by `pynad`:
+
+```yaml
+output_layout: flat
+```
+
+```text
+parquet/pnadc.microdados.trimestral.2025.1.parquet
+```
+
+Flat Parquet conversion also writes `pnadc.microdados.dicionarios.json`.
+To use these files directly with the panel stage of `pynad` 3.0.3, place them
+in the directory that `pynad` expects:
+
+```yaml
+archive: .
+parquet: microdados/parquet
+output_layout: flat
+```
+
+Then pass this repository root to `pynad`. This is panel-stage
+interoperability; do not run `pynad`'s own synchronization/conversion
+maintenance over the same outputs, because its internal source records differ.
+Switching layouts relocates every output, so convert into an empty target
+directory or expect a complete conversion.
 
 ### Build a person panel
 
@@ -360,7 +409,9 @@ Parquet files derived from the converted quarterly data.
 The command filters wave `n` to `v1016 == n`, links people within
 `upa`/`v1008` using sex and birth date, and disambiguates duplicate signatures
 by the within-wave `v2003` order. `--wide` emits one row per linked person with
-wave-suffixed variables.
+wave-suffixed variables. Each input must contain exactly one `ano`/`trimestre`
+period; the command validates chronological order, consecutive quarters, and
+that `--panel-id` identifies the first input.
 
 Panel construction loads the selected waves into memory. Build one panel at a
 time and ensure the machine has enough RAM for the chosen files.

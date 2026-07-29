@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Sequence
 
@@ -28,6 +29,12 @@ def build_panel(
     """
     if not 2 <= len(inputs) <= 5:
         raise ValueError("Panel construction requires 2 to 5 consecutive quarterly files")
+    panel_match = re.fullmatch(r"(20\d{2})([1-4])", str(panel_id))
+    if panel_match is None:
+        raise ValueError(
+            "panel_id must be the first-wave period as YYYYQ, for example 20241"
+        )
+    first_period = int(panel_match.group(1)) * 4 + int(panel_match.group(2)) - 1
     target = Path(output).resolve()
     if target.exists() and not force:
         raise FileExistsError(f"Output already exists; pass --force to replace it: {target}")
@@ -39,21 +46,35 @@ def build_panel(
         raise RuntimeError("Panel construction requires pandas and pyarrow") from exc
 
     frames = []
-    required = set(HOUSEHOLD_COLUMNS + SIGNATURE_COLUMNS + ("v2003",))
+    required = set(
+        HOUSEHOLD_COLUMNS
+        + SIGNATURE_COLUMNS
+        + ("ano", "trimestre", "v1016", "v2003")
+    )
     for wave, raw_path in enumerate(inputs, start=1):
         path = Path(raw_path).resolve()
         frame = pq.read_table(path).to_pandas()
         missing = sorted(required - set(frame.columns))
         if missing:
             raise ValueError(f"{path.name} lacks panel identification columns: {', '.join(missing)}")
-        if "v1016" not in frame.columns:
-            # v1016 identifies which visit a record belongs to, and the wave
-            # filter is the whole basis of the linkage. Inventing it would
-            # quietly treat an unsuitable input — a column-projected file, or
-            # quarters given out of order — as if it were the right one.
+        period_rows = frame[["ano", "trimestre"]].dropna().drop_duplicates()
+        if len(period_rows) != 1:
             raise ValueError(
-                f"{path.name} has no v1016 column, so its visit number is unknown; "
-                "convert without --columns, or include v1016 in the selection"
+                f"{path.name} must contain exactly one ano/trimestre period; "
+                f"found {len(period_rows)}"
+            )
+        year = int(period_rows.iloc[0]["ano"])
+        quarter = int(period_rows.iloc[0]["trimestre"])
+        if quarter not in (1, 2, 3, 4):
+            raise ValueError(f"{path.name} has invalid trimestre {quarter!r}")
+        actual_period = year * 4 + quarter - 1
+        expected_period = first_period + wave - 1
+        if actual_period != expected_period:
+            expected_year, expected_offset = divmod(expected_period, 4)
+            raise ValueError(
+                f"{path.name} is {year}Q{quarter}; expected "
+                f"{expected_year}Q{expected_offset + 1}. Inputs must be "
+                "consecutive quarters in chronological order"
             )
         frame = frame.loc[frame["v1016"] == wave].copy()
         if frame.empty:
